@@ -5,7 +5,7 @@ tracking, no in-app purchases — just the games.
 
 ## 📲 Download
 
-**[⬇ Download the latest APK](https://github.com/gameywolf/Playgiarisim/releases/latest/download/playgiarism.apk)**
+**[⬇ Download the latest APK](https://github.com/gameywolf/Playgiarism/releases/latest/download/playgiarism.apk)**
 
 To install: open the downloaded file on your Android phone and confirm. The first
 time, Android will ask you to allow installs from your browser — enable it, then
