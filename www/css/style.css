@@ -542,3 +542,56 @@ body.home { background: linear-gradient(170deg, #ffeef5, #e8f4ff 55%, #fdf6e3); 
 .wars-turn { text-align: center; font-size: 13px; color: var(--muted); }
 #warsWrap { flex: 1; position: relative; overflow: hidden; }
 #warsCanvas { position: absolute; touch-action: none; }
+
+/* ---------- Nertz ---------- */
+.nertz-hud {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--panel);
+}
+.nertz-hud .nchip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel-2);
+  border-radius: 9px;
+  padding: 5px 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.nertz-hud .nchip .sw { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.nertz-hud .nchip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nertz-hud .nchip b { margin-left: auto; font-size: 14px; }
+.nertz-hud .nchip i { font-style: normal; color: var(--muted); font-size: 11px; }
+#nertzWrap { flex: 1; position: relative; overflow: hidden; background: #cdd6ea; }
+#nertzCanvas { position: absolute; touch-action: none; }
+.nertz-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px calc(8px + var(--safe-bottom));
+  background: var(--panel);
+}
+.nertz-bar .hint { flex: 1; font-size: 11px; color: var(--muted); line-height: 1.3; }
+.nertz-bar button { padding: 8px 12px; font-size: 13px; }
+.nertz-bar .shift { background: #f5b301; color: #fff; font-weight: 600; }
+.score-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.score-table th { color: var(--muted); font-weight: 500; font-size: 12px; text-align: right; padding: 4px 6px; }
+.score-table td { padding: 6px; text-align: right; }
+.score-table td:first-child, .score-table th:first-child { text-align: left; }
+.score-table tr:not(:first-child) { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.score-table .sw { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+.dialog .score-table + button { margin-top: 6px; }
+.tile-nertz { background: linear-gradient(140deg, #1f8a5b, #0f5c3a); }
+.nertz-icon {
+  display: flex;
+  padding: 10px 14px;
+  background: #ffffff2e;
+  border-radius: 12px;
+  font-size: 30px;
+  gap: 2px;
+}
+.nertz-icon span:nth-child(1) { transform: rotate(-12deg); }
+.nertz-icon span:nth-child(2) { transform: rotate(8deg); margin-left: -6px; }

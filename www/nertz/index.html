@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Nertz</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active" id="nertzScreen">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Nertz</h1>
+    <button class="back" id="menuBtn">⋯</button>
+  </div>
+  <div class="nertz-hud" id="nertzHud"></div>
+  <div id="nertzWrap"><canvas id="nertzCanvas"></canvas></div>
+  <div class="nertz-bar">
+    <span class="hint" id="hintLabel">Tap a card to send it to the center · drag to move onto your piles</span>
+    <button id="shiftBtn" class="shift" hidden>🔄 Shift decks +1</button>
+    <button id="endRoundBtn">Stuck? End round</button>
+  </div>
+</div>
+
+<!-- Difficulty chooser -->
+<div class="overlay active" id="diffOverlay">
+  <div class="dialog">
+    <h2>🃏 Nertz</h2>
+    <p>A real-time race against three CPUs. Empty your 13-card <b>Nertz pile</b> before they empty theirs. Build the shared center piles up by suit from the Ace — every card you send there is +1, every card left in your Nertz pile is −2. First to 100 wins.</p>
+    <div class="mode-grid">
+      <button class="mode-sq mode-3p" id="diffEasy"><span class="inner">🙂<b>Easy</b></span></button>
+      <button class="mode-sq mode-2p" id="diffMedium"><span class="inner">😐<b>Medium</b></span></button>
+      <button class="mode-sq mode-cpu" id="diffHard"><span class="inner">😈<b>Hard</b></span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Round over -->
+<div class="overlay" id="roundOverlay">
+  <div class="dialog">
+    <h2 id="roundTitle">Round over</h2>
+    <table class="score-table" id="roundTable"></table>
+    <button class="primary" id="nextRoundBtn">Next round</button>
+  </div>
+</div>
+
+<!-- Match over -->
+<div class="overlay" id="matchOverlay">
+  <div class="dialog">
+    <h2 id="matchTitle">🏆</h2>
+    <table class="score-table" id="matchTable"></table>
+    <button class="primary" id="newMatchBtn">New match</button>
+  </div>
+</div>
+
+<!-- Menu -->
+<div class="overlay" id="menuOverlay">
+  <div class="dialog">
+    <h2>Menu</h2>
+    <button id="resumeBtn" class="primary">Resume</button>
+    <button id="groupSuitsBtn">Group center piles by suit: Off</button>
+    <button id="restartBtn">Restart match</button>
+    <button id="changeDiffBtn">Change difficulty</button>
+  </div>
+</div>
+
+<script src="nertz.js"></script>
+</body>
+</html>
