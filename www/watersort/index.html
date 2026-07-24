@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Water Sort</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Water Sort</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Level</div><div class="val" id="hudLevel">1</div></div>
+    <button id="undoBtn" title="Undo">↩️</button>
+    <button id="restartBtn" title="Restart level">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Level complete -->
+<div class="overlay" id="winOverlay">
+  <div class="dialog">
+    <h2 id="winTitle">🎉 Level Complete!</h2>
+    <button class="primary" id="nextBtn">Next Level</button>
+  </div>
+</div>
+
+<script src="watersort.js"></script>
+</body>
+</html>

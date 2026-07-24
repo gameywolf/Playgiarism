@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Balls</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Balls</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Round</div><div class="val" id="hudRound">1</div></div>
+    <div class="hud-box"><div class="label" style="white-space:nowrap">Best D/W/All</div><div class="val" id="hudBests" style="font-size:12px;white-space:nowrap">0/0/0</div></div>
+    <div class="hud-box"><div class="label">Coins</div><div class="val" id="hudCoins" style="font-size:14px">🪙 0</div></div>
+    <button id="storeBtn" title="Store">🛒</button>
+    <button id="newBtn" title="New game">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Game over -->
+<div class="overlay" id="overOverlay">
+  <div class="dialog">
+    <h2>Game Over</h2>
+    <p>You survived</p>
+    <p style="font-size:32px;color:var(--text)"><b id="finalScore">0</b> <span style="font-size:16px">rounds</span></p>
+    <p id="recordNote"></p>
+    <p id="coinNote"></p>
+    <div class="scores-row" id="finalBests"></div>
+    <button class="primary" id="restartBtn">Play Again</button>
+  </div>
+</div>
+
+<!-- Store -->
+<div class="overlay" id="storeOverlay">
+  <div class="dialog store-dialog">
+    <div class="store-head"><h2>Store</h2><div class="store-coins" id="storeCoins">🪙 0</div></div>
+    <p class="store-section">Ball skins</p>
+    <div class="store-grid" id="ballGrid"></div>
+    <p class="store-section">Trails</p>
+    <div class="store-grid" id="trailGrid"></div>
+    <button class="primary" id="storeClose">Done</button>
+  </div>
+</div>
+
+<script src="balls.js"></script>
+</body>
+</html>

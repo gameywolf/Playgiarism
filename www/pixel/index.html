@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Pixel Color by Number</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<!-- Gallery screen -->
+<div class="screen active" id="galleryScreen">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Pixel Color by Number</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="gallery" id="galleryGrid"></div>
+</div>
+
+<!-- Setup screen -->
+<div class="screen" id="setupScreen">
+  <div class="topbar">
+    <button class="back" id="setupBack">←</button>
+    <h1>New Picture</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="setup-body">
+    <div class="preview-box"><canvas id="previewCanvas"></canvas></div>
+    <div class="field">
+      <label>Grid size: <span class="value" id="gridSizeVal">64</span> cells (longest side)</label>
+      <input type="range" id="gridSizeInput" min="16" max="256" step="8" value="64">
+    </div>
+    <div class="field">
+      <label>Colors: <span class="value" id="colorCountVal">12</span></label>
+      <input type="range" id="colorCountInput" min="2" max="50" step="1" value="12">
+    </div>
+    <button class="primary" id="createBtn">Start Coloring</button>
+  </div>
+</div>
+
+<!-- Play screen -->
+<div class="screen" id="playScreen">
+  <div class="topbar">
+    <button class="back" id="playBack">←</button>
+    <h1 id="playTitle">Coloring</h1>
+    <div class="spacer" id="playPct" style="width:auto;font-size:13px;color:var(--muted)"></div>
+  </div>
+  <div class="board-wrap">
+    <canvas id="boardCanvas"></canvas>
+    <canvas id="confettiCanvas"></canvas>
+    <div class="tool-tray" id="toolTray">
+      <button class="tool" id="toolBrush">🖌️</button>
+      <button class="tool" id="toolBucket">🪣</button>
+    </div>
+    <button class="tool-fab" id="toolFab">🖌️</button>
+  </div>
+  <div class="palette" id="palette"></div>
+</div>
+
+<!-- New picture source chooser -->
+<div class="overlay" id="sourceOverlay">
+  <div class="dialog">
+    <h2>New Picture</h2>
+    <p>Where should the picture come from?</p>
+    <div class="src-buttons">
+      <button id="srcCamera">📷<br>Camera</button>
+      <button id="srcGallery">🖼️<br>Photos</button>
+    </div>
+    <button id="srcCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Completion overlay -->
+<div class="overlay" id="doneOverlay">
+  <div class="dialog">
+    <h2>🎉 Complete!</h2>
+    <div class="preview-box"><canvas id="doneCanvas"></canvas></div>
+    <button class="primary" id="doneBtn">Back to Gallery</button>
+  </div>
+</div>
+
+<!-- Fullscreen viewer for finished pictures (tap anywhere to close) -->
+<div class="viewer" id="viewerOverlay">
+  <canvas id="viewerCanvas"></canvas>
+</div>
+
+<input type="file" id="filePick" accept="image/*" style="display:none">
+<input type="file" id="fileCapture" accept="image/*" capture="environment" style="display:none">
+
+<script src="pixel.js"></script>
+</body>
+</html>

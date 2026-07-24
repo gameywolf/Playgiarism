@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Fruit Merge</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active" id="gameScreen">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Fruit Merge</h1>
+    <div class="spacer"></div>
+  </div>
+
+  <div class="fruit-hud">
+    <div class="hud-box" style="flex:1.4">
+      <div class="label">Score</div>
+      <div class="val" id="hudScore">0</div>
+    </div>
+    <div class="hud-box">
+      <div class="label">Next</div>
+      <div class="val"><canvas id="nextCanvas" width="56" height="28" style="vertical-align:middle"></canvas></div>
+    </div>
+    <div class="hud-box" style="flex:1.6">
+      <div class="label">Best · Day / Week / All</div>
+      <div class="val" style="font-size:12px" id="hudBests">0 / 0 / 0</div>
+    </div>
+  </div>
+
+  <div id="fruitCanvasWrap">
+    <canvas id="fruitCanvas"></canvas>
+    <div class="fruit-controls">
+      <button id="clearBtn" title="Clear small fruit">
+        <span class="pu-icon">🧹</span>
+        <span class="uses" id="clearUses"></span>
+        <span class="cd-mask" id="clearCd"></span>
+      </button>
+      <button id="undoBtn" title="Undo last drop">
+        <span class="pu-icon">↩️</span>
+        <span class="uses" id="undoUses"></span>
+        <span class="cd-mask" id="undoCd"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="gameOverOverlay">
+  <div class="dialog">
+    <h2>Game Over</h2>
+    <p style="font-size:26px;color:var(--text);font-weight:700" id="finalScore">0</p>
+    <p id="recordNote"></p>
+    <div class="scores-row" id="finalBests"></div>
+    <button class="primary" id="restartBtn">Play Again</button>
+    <button onclick="location.href='../index.html'">Home</button>
+  </div>
+</div>
+
+<script src="../vendor/matter.min.js"></script>
+<script src="fruit.js"></script>
+</body>
+</html>

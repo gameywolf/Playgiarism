@@ -1,0 +1,9 @@
+{
+  "appId": "com.gameywolf.playgiarism",
+  "appName": "Playgiarism",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "disable"
+  }
+}

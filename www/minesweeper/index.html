@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Minesweeper</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Minesweeper</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Mines</div><div class="val" id="hudMines">0</div></div>
+    <div class="hud-box"><div class="label">Time</div><div class="val" id="hudTime">0</div></div>
+    <button id="flagBtn" title="Flag mode">🚩</button>
+    <button id="newBtn" title="New game">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Difficulty chooser -->
+<div class="overlay active" id="diffOverlay">
+  <div class="dialog">
+    <h2>💣 Minesweeper</h2>
+    <p>Tap to dig. Hold (or use 🚩 mode) to flag a mine. Numbers show how many mines touch that square. Clear every safe square to win!</p>
+    <button class="primary" data-diff="easy">🌱 Easy<span class="diff-best" id="bestEasy"></span></button>
+    <button data-diff="medium">🌼 Medium<span class="diff-best" id="bestMedium"></span></button>
+    <button data-diff="hard">🌋 Hard<span class="diff-best" id="bestHard"></span></button>
+  </div>
+</div>
+
+<!-- Win / lose -->
+<div class="overlay" id="endOverlay">
+  <div class="dialog">
+    <h2 id="endTitle"></h2>
+    <p id="endText"></p>
+    <p id="recordNote"></p>
+    <button class="primary" id="againBtn">Play Again</button>
+    <button id="changeDiffBtn">Change Difficulty</button>
+  </div>
+</div>
+
+<script src="minesweeper.js"></script>
+</body>
+</html>

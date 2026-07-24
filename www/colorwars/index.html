@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Color Wars</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active" id="warsScreen">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Color Wars</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="wars-hud">
+    <div class="wars-chips" id="warsChips"></div>
+    <div class="wars-turn" id="turnLabel"></div>
+  </div>
+  <div id="warsWrap"><canvas id="warsCanvas"></canvas></div>
+</div>
+
+<!-- Mode chooser -->
+<div class="overlay active" id="modeOverlay">
+  <div class="dialog">
+    <h2>⚔️ Color Wars</h2>
+    <p>Your first tap drops 3 dots on any empty square. After that, tap your own squares to add a dot — at 4 the square explodes into its neighbors and steals them. Last color standing wins!</p>
+    <div class="mode-grid">
+      <button class="mode-sq mode-cpu" id="modeCpu"><span class="inner">🤖<b>vs CPU</b></span></button>
+      <button class="mode-sq mode-2p" id="mode2p"><span class="inner">👥<b>2 Players</b></span></button>
+      <button class="mode-sq mode-3p" id="mode3p"><span class="inner">👥<b>3 Players</b></span></button>
+      <button class="mode-sq mode-4p" id="mode4p"><span class="inner">👥<b>4 Players</b></span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Winner -->
+<div class="overlay" id="winOverlay">
+  <div class="dialog">
+    <h2 id="winTitle"></h2>
+    <button class="primary" id="againBtn">Play Again</button>
+    <button id="changeModeBtn">Change Mode</button>
+  </div>
+</div>
+
+<script src="colorwars.js"></script>
+</body>
+</html>
