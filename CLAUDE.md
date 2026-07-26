@@ -79,7 +79,9 @@ scraping the originals' servers or APIs.
     clamped to 2.2 so stalling is always punished). Tricks — hoops to fall through,
     bullseyes hit on wall contact, 1-2-3 bounce-pad hop chains — grant bonus metres and
     charge a Frenzy meter (invulnerable fast descent). Boulders fall along the wall after
-    a flashing warning from 120 m. Score = metres descended incl. trick bonuses, best
+    a flashing warning from 120 m — spawned ~1.15 screen-heights above the climber so
+    modulating descent speed can shift the pass-moment by more than one swing period
+    (i.e. a safe swing phase is always reachable; don't shrink that spawn gap). Score = metres descended incl. trick bonuses, best
     D/W/all under `awesomefalling.scores.v1`, lifetime coins under
     `awesomefalling.coins.v1`. No mid-run resume)
   - `www/nertz/` — Nertz (real-time solitaire race: you + 3 CPUs, each with a 13-card Nertz pile, 4 work piles, and a 3-at-a-time stock, all racing simultaneously onto shared centre foundations built up by suit from the Ace; no turns — CPUs act on difficulty-scaled timers (Easy/Medium/Hard = speed + skill); tap a card to send it to the centre, drag to move onto your piles; empty your Nertz pile to end the round; +1 per card sent to centre, -2 per card left in Nertz pile; match to 100; state under `nertz.state.v1`)

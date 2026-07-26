@@ -376,14 +376,17 @@ function update(dtms) {
   if (dist > 120) {
     boulderT -= dt;
     if (boulderT <= 0) {
-      warns.push({ t: 0, ms: 850, cpx: G.A * (0.06 + Math.random() * 0.3) });
+      // lanes hug the wall so a full swing-out always clears them
+      warns.push({ t: 0, ms: 850, cpx: G.A * (0.05 + Math.random() * 0.17) });
       boulderT = Math.max(3.5, 8 - dist / 300) * (0.7 + Math.random() * 0.6);
     }
   }
   for (const w of warns) {
     w.t += dtms;
     if (w.t >= w.ms) {
-      boulders.push({ wy: camY() - u * 0.15, cpx: w.cpx, r: u * 0.05, rot: 0 });
+      // spawned a full swing-period's worth of approach above the climber, so
+      // modulating descent speed can always shift the pass into a safe phase
+      boulders.push({ wy: climberY - u * 1.15, cpx: w.cpx, r: u * 0.05, rot: 0 });
     }
   }
   warns = warns.filter(w => w.t < w.ms);
@@ -661,6 +664,10 @@ function drawCoin(c) {
 function drawBoulder(b) {
   const y = b.wy - camY();
   const x = G.wallX + b.cpx;
+  if (y < -b.r) {   // still above the screen — keep flashing where it will fall
+    drawWarnMarker(x, pulse);
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(b.rot);
@@ -683,9 +690,10 @@ function drawBoulder(b) {
   ctx.restore();
 }
 
-function drawWarn(w) {
-  const on = Math.floor(w.t / 130) % 2 === 0;
-  const x = G.wallX + w.cpx;
+function drawWarn(w) { drawWarnMarker(G.wallX + w.cpx, w.t); }
+
+function drawWarnMarker(x, t) {
+  const on = Math.floor(t / 130) % 2 === 0;
   const s = G.unit * 0.05;
   ctx.globalAlpha = on ? 1 : 0.55;
   ctx.fillStyle = '#ff5e7e';
