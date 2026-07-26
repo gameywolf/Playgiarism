@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Ricochet</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Ricochet</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Level</div><div class="val" id="hudLevel">1</div></div>
+    <div class="hud-box"><div class="label">Score</div><div class="val" id="hudScore">0</div></div>
+    <div class="hud-box"><div class="label">Orange</div><div class="val" id="hudOrange">0</div></div>
+    <div class="hud-box"><div class="label">Balls</div><div class="val" id="hudBalls">10</div></div>
+    <button id="newBtn" title="New game">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Level cleared -->
+<div class="overlay" id="winOverlay">
+  <div class="dialog">
+    <h2>Level Cleared!</h2>
+    <p id="winNote"></p>
+    <p style="font-size:32px;color:var(--text)"><b id="winScore">0</b></p>
+    <div class="scores-row" id="winBests"></div>
+    <button class="primary" id="nextBtn">Next Level</button>
+  </div>
+</div>
+
+<!-- Out of balls -->
+<div class="overlay" id="overOverlay">
+  <div class="dialog">
+    <h2>Out of Balls</h2>
+    <p id="overNote"></p>
+    <p style="font-size:32px;color:var(--text)"><b id="finalScore">0</b></p>
+    <p id="recordNote"></p>
+    <div class="scores-row" id="finalBests"></div>
+    <button class="primary" id="retryBtn">Retry Level</button>
+    <button id="restartBtn">New Game</button>
+  </div>
+</div>
+
+<script src="ricochet.js"></script>
+</body>
+</html>
