@@ -27,6 +27,7 @@ the network.
 | Nertz | Nertz / Pounce (public-domain card game) |
 | Jet Rush | Jetpack Joyride |
 | Awesome Falling | Radical Rappelling |
+| Ricochet | Peggle |
 
 ## Building from source
 

@@ -60,6 +60,17 @@ scraping the originals' servers or APIs.
   - `www/minesweeper/` — Minesweeper (3 difficulties; tap digs, long-press or 🚩-mode flags, chording; safe first tap; best times under `minesweeper.best.v1`)
   - `www/blockparty/` — Block Party (Block Blast clone: drag 3 pieces onto 8×8, clear rows/cols; combo-multiplied line bonuses + all-clear bonus; unplayable tray pieces grey out; board resumes + daily/weekly/all-time bests under `blockparty.state.v1` / `blockparty.scores.v1`)
   - `www/balls/` — Balls (Ballz clone: slingshot-aim a volley of bouncing balls at numbered blocks, white-dot sightline; launcher moves to where the first ball lands; double-tap fast-forwards; +1 ball rings grow the volley, coin pickups buy ball skins/trails in a store under `balls.store.v1`; score = rounds survived; run resumes + daily/weekly/all-time bests under `balls.state.v1` / `balls.scores.v1`)
+  - `www/ricochet/` — Ricochet (Peggle-style: drop a ball from a top cannon into a peg
+    field and clear every orange peg within 10 balls; blue pegs score, green ★ pegs grant
+    Long Guide / Blaster / Multiball, one purple bonus peg is re-rolled each shot, and a
+    sliding bucket catches the ball for a free one. Score multiplier climbs as oranges
+    clear; the last orange drops into slow motion. Levels come from a seeded generator
+    (five layout families) so level N is reproducible without shipping a level list.
+    The playfield is a fixed aspect with gutters (like Balls) — otherwise the peg lattice
+    stretches with the window and the gap-to-ball ratio, which decides whether shots
+    cascade, differs between phone and desktop. `BALL_R_F`/`PEG_GAP_F`/`PEG_E` at the top
+    are a coupled set picked by sweeping them against full-level outcomes; change one and
+    re-run the sweep. Progress under `ricochet.state.v1`, bests under `ricochet.scores.v1`)
   - `www/jetrush/` — Jet Rush (endless jetpack runner: hold anywhere to thrust, release to
     drop, dodge zappers/laser gates/homing missiles and collect coins over a parallax dusk
     city; all art is procedural canvas drawing, no sprites. Difficulty is driven by
