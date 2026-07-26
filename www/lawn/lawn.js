@@ -514,9 +514,19 @@ function updateMowers(dt) {
     const m = mowers[c];
     if (!m) continue;
     if (m.running) {
-      m.row -= MOWER_SPEED * dt / 1000;
-      for (const z of zombies) {
-        if (!z.dead && z.lane === c && Math.abs(z.row + 0.5 - m.row) < 0.7) hurt(z, 99999, false);
+      // Sweep in small steps rather than jumping the whole frame at once. At MOWER_SPEED
+      // a single 50ms frame (the dt clamp in loop(), i.e. one dropped frame) moves the
+      // mower 0.45 rows — further than its own hit window — so testing only the
+      // post-move position let it tunnel straight past the shambler it was launched at.
+      // That wasted the mower *and* ended the run on a breach that should be survivable.
+      let move = MOWER_SPEED * dt / 1000;
+      while (move > 0) {
+        const step = Math.min(move, 0.3);
+        m.row -= step;
+        move -= step;
+        for (const z of zombies) {
+          if (!z.dead && z.lane === c && Math.abs(z.row + 0.5 - m.row) < 0.7) hurt(z, 99999, false);
+        }
       }
       if (m.row < -1.6) mowers[c] = null;
     }
