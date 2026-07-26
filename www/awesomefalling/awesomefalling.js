@@ -1,11 +1,11 @@
-/* Rock Bottom — endless rappelling race. You swing off a cliff wall on a rope;
+/* Awesome Falling — endless rappelling race. You swing off a cliff wall on a rope;
    hold to rappel down, release to stop. Dodge the crystals, outrun the lava,
    and rack up tricks (hoops, bullseyes, hop chains) to charge a Frenzy burst.
    Score is metres descended. */
 'use strict';
 
-const SCORE_KEY = 'rockbottom.scores.v1';
-const COIN_KEY = 'rockbottom.coins.v1';   // lifetime coin tally (no store; just a keepsake)
+const SCORE_KEY = 'awesomefalling.scores.v1';
+const COIN_KEY = 'awesomefalling.coins.v1';   // lifetime coin tally (no store; just a keepsake)
 
 const DEATH_MS = 1200;
 const POPUP_MS = 900;
@@ -90,10 +90,10 @@ function layout() {
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
   const prev = G;
-  const wallX = r.width * 0.84;
+  const wallX = r.width * 0.16;   // cliff face on the left, swing out to the right
   // the swing is a bounce–glide cycle: kick off the wall, decelerate, drift back.
   // kickV/gPull are derived from amplitude + period so tuning stays in one place.
-  const A = wallX * 0.62, T = 1.05;
+  const A = (r.width - wallX) * 0.62, T = 1.05;
   G = {
     w: r.width, h: r.height,
     unit: r.height,
@@ -217,7 +217,7 @@ function addCharge(v) {
   charge = Math.min(1, charge + v);
   if (charge >= 1) {
     frenzyT = FRENZY_MS;
-    popups.push({ x: G.wallX - px, wy: climberY - G.unit * 0.06, txt: 'FRENZY!', col: '#ff5e7e', t: 0 });
+    popups.push({ x: G.wallX + px, wy: climberY - G.unit * 0.06, txt: 'FRENZY!', col: '#ff5e7e', t: 0 });
     if (navigator.vibrate) navigator.vibrate(30);
   }
 }
@@ -238,15 +238,15 @@ function trick(txt, metres, chg, x, wy) {
 function onWallContact() {
   for (let i = 0; i < 4; i++) {
     sparks.push({
-      x: G.wallX - Math.random() * G.unit * 0.01, wy: climberY + (Math.random() - 0.5) * G.bodyR,
-      vx: -G.unit * (0.05 + Math.random() * 0.12), vy: (Math.random() - 0.5) * G.unit * 0.1,
+      x: G.wallX + Math.random() * G.unit * 0.01, wy: climberY + (Math.random() - 0.5) * G.bodyR,
+      vx: G.unit * (0.05 + Math.random() * 0.12), vy: (Math.random() - 0.5) * G.unit * 0.1,
       t: 0, life: 300, col: '#d9c4a8', size: G.unit * 0.004,
     });
   }
   for (const f of feats) {
     if (f.kind === 'target' && !f.used && Math.abs(climberY - f.y) < f.h / 2) {
       f.used = true;
-      trick('Bullseye!', 8, 0.22, G.wallX - G.unit * 0.02, f.y);
+      trick('Bullseye!', 8, 0.22, G.wallX + G.unit * 0.02, f.y);
     }
   }
 }
@@ -255,8 +255,8 @@ function padHit(pad) {
   pad.hit = true;
   pad.hitT = 1;
   pad.set.n++;
-  if (pad.set.n === 3) trick('Hop Chain!', 10, 0.26, G.wallX - pad.prot, pad.y);
-  else trick(`${pad.idx + 1}!`, 2, 0.08, G.wallX - pad.prot, pad.y);
+  if (pad.set.n === 3) trick('Hop Chain!', 10, 0.26, G.wallX + pad.prot, pad.y);
+  else trick(`${pad.idx + 1}!`, 2, 0.08, G.wallX + pad.prot, pad.y);
 }
 
 // ---------------- Death / finish ----------------
@@ -266,8 +266,8 @@ function die(cause) {
   deathCause = cause;
   deathT = 0;
   death = {
-    x: G.wallX - px, y: G.py,
-    vx: -G.unit * (0.25 + Math.random() * 0.15), vy: -G.unit * 0.45, spin: 0,
+    x: G.wallX + px, y: G.py,
+    vx: G.unit * (0.25 + Math.random() * 0.15), vy: -G.unit * 0.45, spin: 0,
   };
   const cols = cause === 'lava' ? ['#ff8c42', '#ffd166', '#ff5e7e'] : ['#b985f4', '#ffd166', '#fff1c9'];
   for (let i = 0; i < 26; i++) {
@@ -410,7 +410,7 @@ function update(dtms) {
     if (f.kind === 'ring' && !f.got &&
         prevY <= f.y && climberY > f.y && Math.abs(px - f.cx) < f.hw) {
       f.got = true;
-      trick('Hoop!', 5, 0.2, G.wallX - f.cx, f.y);
+      trick('Hoop!', 5, 0.2, G.wallX + f.cx, f.y);
     }
   }
   feats = feats.filter(f => f.y > camY() - u * 0.3 && !(f.kind === 'ring' && f.got));
@@ -423,7 +423,7 @@ function update(dtms) {
       const v = frenzy ? 2 : 1;
       coins += v;
       updateHud();
-      popups.push({ x: G.wallX - c.cpx, wy: c.wy, txt: '+' + v, col: '#ffd166', t: 0 });
+      popups.push({ x: G.wallX + c.cpx, wy: c.wy, txt: '+' + v, col: '#ffd166', t: 0 });
     }
   }
   coinsW = coinsW.filter(c => !c.gone && c.wy > camY() - u * 0.1);
@@ -431,7 +431,7 @@ function update(dtms) {
   // frenzy trail
   if (frenzy) {
     sparks.push({
-      x: G.wallX - px + (Math.random() - 0.5) * G.bodyR, wy: climberY - G.bodyR,
+      x: G.wallX + px + (Math.random() - 0.5) * G.bodyR, wy: climberY - G.bodyR,
       vx: (Math.random() - 0.5) * u * 0.1, vy: -u * (0.1 + Math.random() * 0.2),
       t: 0, life: 400, col: `hsl(${(pulse / 3) % 360},90%,65%)`, size: u * 0.007,
     });
@@ -459,7 +459,7 @@ function drawSky() {
   const cs = climberY * 0.12;
   for (let i = 0; i < 6; i++) {
     const cy = ((i * G.h * 0.43 + cs) % (G.h * 1.6) + G.h * 1.6) % (G.h * 1.6) - G.h * 0.3;
-    const cx = G.wallX * (0.1 + hash(i * 5.5) * 0.7);
+    const cx = G.wallX + (G.w - G.wallX) * (0.1 + hash(i * 5.5) * 0.7);
     const cw = G.h * (0.09 + hash(i * 9.1) * 0.1);
     ctx.beginPath();
     for (let k2 = -1; k2 <= 1; k2++) {
@@ -483,33 +483,34 @@ function edgePoints(baseX, sign, chunk, para, jag) {
 }
 
 function drawFarCliff() {
-  const pts = edgePoints(G.w * 0.08, 1, G.unit * 0.14, 0.35, G.w * 0.03);
+  const pts = edgePoints(G.w * 0.92, -1, G.unit * 0.14, 0.35, G.w * 0.03);
   ctx.fillStyle = '#a2bdd8';
   ctx.beginPath();
-  ctx.moveTo(0, -10);
+  ctx.moveTo(G.w, -10);
   for (const [x, y] of pts) ctx.lineTo(x, y);
-  ctx.lineTo(0, G.h + 10);
+  ctx.lineTo(G.w, G.h + 10);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#8aa8c6';
   const cy = camY() * 0.35;
   for (let i = Math.floor(cy / (G.unit * 0.3)); i * G.unit * 0.3 < cy + G.h; i++) {
     if (hash(i * 7.7) < 0.5) continue;
-    ctx.fillRect(0, i * G.unit * 0.3 - cy, G.w * (0.03 + hash(i * 3.3) * 0.04), Math.max(2, G.unit * 0.006));
+    const len = G.w * (0.03 + hash(i * 3.3) * 0.04);
+    ctx.fillRect(G.w - len, i * G.unit * 0.3 - cy, len, Math.max(2, G.unit * 0.006));
   }
 }
 
 function drawWall() {
-  const pts = edgePoints(G.wallX, -1, G.unit * 0.09, 1, G.w * 0.025);
-  const g = ctx.createLinearGradient(G.wallX - G.w * 0.03, 0, G.w, 0);
+  const pts = edgePoints(G.wallX, 1, G.unit * 0.09, 1, G.w * 0.025);
+  const g = ctx.createLinearGradient(G.wallX + G.w * 0.03, 0, 0, 0);
   g.addColorStop(0, '#96704f');
   g.addColorStop(0.4, '#83593d');
   g.addColorStop(1, '#6d4a35');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(G.w + 10, -10);
+  ctx.moveTo(-10, -10);
   for (const [x, y] of pts) ctx.lineTo(x, y);
-  ctx.lineTo(G.w + 10, G.h + 10);
+  ctx.lineTo(-10, G.h + 10);
   ctx.closePath();
   ctx.fill();
   // sun-catch on the rim
@@ -523,11 +524,11 @@ function drawWall() {
   for (let i = Math.floor(camY() / step); i * step < camY() + G.h; i++) {
     const y = i * step - camY();
     ctx.fillStyle = '#00000016';
-    ctx.fillRect(G.wallX - G.w * 0.01, y, G.w, Math.max(2, G.unit * (0.006 + hash(i * 4.1) * 0.012)));
+    ctx.fillRect(0, y, G.wallX + G.w * 0.01, Math.max(2, G.unit * (0.006 + hash(i * 4.1) * 0.012)));
     if (hash(i * 9.3) > 0.4) {
       ctx.fillStyle = '#ffffff10';
       ctx.beginPath();
-      ctx.arc(G.wallX + G.w * (0.03 + hash(i * 6.2) * 0.1), y + step * 0.5, G.unit * 0.008, 0, 7);
+      ctx.arc(G.wallX - G.w * (0.03 + hash(i * 6.2) * 0.1), y + step * 0.5, G.unit * 0.008, 0, 7);
       ctx.fill();
     }
   }
@@ -535,40 +536,40 @@ function drawWall() {
 
 function drawSpike(f) {
   const y = f.y - camY();
-  const tip = G.wallX - f.len;
+  const tip = G.wallX + f.len;
   ctx.fillStyle = '#b985f4';
   ctx.beginPath();
-  ctx.moveTo(G.wallX + 2, y - f.h / 2);
+  ctx.moveTo(G.wallX - 2, y - f.h / 2);
   ctx.lineTo(tip, y);
-  ctx.lineTo(G.wallX + 2, y + f.h / 2);
+  ctx.lineTo(G.wallX - 2, y + f.h / 2);
   ctx.closePath();
   ctx.fill();
   // lit facet
   ctx.fillStyle = '#d9b8ff';
   ctx.beginPath();
-  ctx.moveTo(G.wallX + 2, y - f.h / 2);
+  ctx.moveTo(G.wallX - 2, y - f.h / 2);
   ctx.lineTo(tip, y);
-  ctx.lineTo(G.wallX + 2, y - f.h * 0.1);
+  ctx.lineTo(G.wallX - 2, y - f.h * 0.1);
   ctx.closePath();
   ctx.fill();
   // little sister crystal
   ctx.fillStyle = '#a06fe0';
   ctx.beginPath();
-  ctx.moveTo(G.wallX + 2, y + f.h * 0.2);
-  ctx.lineTo(G.wallX - f.len * 0.4, y + f.h * 0.42);
-  ctx.lineTo(G.wallX + 2, y + f.h * 0.62);
+  ctx.moveTo(G.wallX - 2, y + f.h * 0.2);
+  ctx.lineTo(G.wallX + f.len * 0.4, y + f.h * 0.42);
+  ctx.lineTo(G.wallX - 2, y + f.h * 0.62);
   ctx.closePath();
   ctx.fill();
   // glint
   ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.3 * Math.sin(pulse / 300 + f.y)})`;
   ctx.beginPath();
-  ctx.arc(tip + f.len * 0.18, y - f.h * 0.08, G.unit * 0.005, 0, 7);
+  ctx.arc(tip - f.len * 0.18, y - f.h * 0.08, G.unit * 0.005, 0, 7);
   ctx.fill();
 }
 
 function drawTarget(f) {
   const y = f.y - camY();
-  const cx = G.wallX + G.w * 0.055, r = f.h * 0.42;
+  const cx = G.wallX - G.w * 0.055, r = f.h * 0.42;
   const cols = f.used ? ['#c9beb0', '#e8e2d8', '#c9beb0'] : ['#ff7043', '#ffefd4', '#ff7043'];
   for (let i = 0; i < 3; i++) {
     ctx.fillStyle = cols[i];
@@ -590,33 +591,33 @@ function drawTarget(f) {
 function drawPad(f) {
   const y = f.y - camY();
   const len = f.prot * (1 + f.hitT * 0.12);
-  const x = G.wallX - len;
+  const x = G.wallX + len;
   const h = f.h;
   ctx.fillStyle = f.hit ? '#8adf9c' : '#59c96f';
   ctx.beginPath();
-  ctx.moveTo(G.wallX + 2, y - h * 0.3);
-  ctx.lineTo(x + h * 0.5, y - h * 0.5);
-  ctx.quadraticCurveTo(x - h * 0.4, y, x + h * 0.5, y + h * 0.5);
-  ctx.lineTo(G.wallX + 2, y + h * 0.3);
+  ctx.moveTo(G.wallX - 2, y - h * 0.3);
+  ctx.lineTo(x - h * 0.5, y - h * 0.5);
+  ctx.quadraticCurveTo(x + h * 0.4, y, x - h * 0.5, y + h * 0.5);
+  ctx.lineTo(G.wallX - 2, y + h * 0.3);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#3da354';
-  ctx.fillRect(x + h * 0.5, y + h * 0.18, len - h * 0.5, h * 0.32);
+  ctx.fillRect(G.wallX, y + h * 0.18, len - h * 0.5, h * 0.32);
   // number disc at the tip
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.arc(x + h * 0.15, y, h * 0.42, 0, 7);
+  ctx.arc(x - h * 0.15, y, h * 0.42, 0, 7);
   ctx.fill();
   ctx.fillStyle = '#2f7a40';
   ctx.font = `800 ${h * 0.62}px 'Segoe UI', sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(String(f.idx + 1), x + h * 0.15, y + h * 0.04);
+  ctx.fillText(String(f.idx + 1), x - h * 0.15, y + h * 0.04);
 }
 
 function drawRing(f) {
   const y = f.y - camY();
-  const x = G.wallX - f.cx;
+  const x = G.wallX + f.cx;
   ctx.save();
   ctx.translate(x, y);
   ctx.strokeStyle = '#f0a92e';
@@ -639,7 +640,7 @@ function drawRing(f) {
 
 function drawCoin(c) {
   const y = c.wy - camY();
-  const x = G.wallX - c.cpx;
+  const x = G.wallX + c.cpx;
   const r = G.unit * 0.026;
   const sq = Math.abs(Math.cos(c.spin));
   ctx.save();
@@ -659,7 +660,7 @@ function drawCoin(c) {
 
 function drawBoulder(b) {
   const y = b.wy - camY();
-  const x = G.wallX - b.cpx;
+  const x = G.wallX + b.cpx;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(b.rot);
@@ -684,7 +685,7 @@ function drawBoulder(b) {
 
 function drawWarn(w) {
   const on = Math.floor(w.t / 130) % 2 === 0;
-  const x = G.wallX - w.cpx;
+  const x = G.wallX + w.cpx;
   const s = G.unit * 0.05;
   ctx.globalAlpha = on ? 1 : 0.55;
   ctx.fillStyle = '#ff5e7e';
@@ -704,23 +705,24 @@ function drawWarn(w) {
 
 function drawClimber() {
   const dying = phase === 'dying';
-  const x = dying ? death.x : G.wallX - px;
+  const x = dying ? death.x : G.wallX + px;
   const y = dying ? death.y : G.py;
   const r = G.bodyR;
 
   if (!dying) {
     // rope from the rim above, bowing with the swing
-    const ax = G.wallX - px * 0.1;
+    const ax = G.wallX + px * 0.1;
     ctx.strokeStyle = '#e8d0a0';
     ctx.lineWidth = Math.max(2, G.unit * 0.005);
     ctx.beginPath();
     ctx.moveTo(ax, -G.h * 0.03);
-    ctx.quadraticCurveTo((ax + x) / 2 + px * 0.14, y * 0.45, x, y - r * 1.1);
+    ctx.quadraticCurveTo((ax + x) / 2 - px * 0.14, y * 0.45, x, y - r * 1.1);
     ctx.stroke();
   }
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(-1, 1);   // the sprite is authored wall-on-the-right; mirror it
   if (dying) ctx.rotate(death.spin);
   else ctx.rotate(Math.max(-0.45, Math.min(0.45, -vx / G.kickV * 0.35 + vy / (G.unit * 1.4) * 0.2)));
 
@@ -828,7 +830,7 @@ function drawLava() {
 
 function drawMeter() {
   const u = G.unit;
-  const x = u * 0.018, w = u * 0.014;
+  const w = u * 0.014, x = G.w - u * 0.018 - w;
   const top = G.h * 0.32, hh = G.h * 0.36;
   ctx.fillStyle = '#ffffff2a';
   ctx.beginPath();
@@ -894,7 +896,7 @@ function draw() {
   if (phase === 'run' || phase === 'dying') {
     ctx.fillStyle = '#ffffff40';
     ctx.font = `800 ${G.unit * 0.1}px 'Segoe UI', sans-serif`;
-    ctx.fillText(dist + ' m', G.w * 0.44, G.h * 0.1);
+    ctx.fillText(dist + ' m', G.w * 0.56, G.h * 0.1);
   }
 
   if (phase === 'ready') {
@@ -903,12 +905,12 @@ function draw() {
     ctx.font = `800 ${G.unit * 0.05}px 'Segoe UI', sans-serif`;
     ctx.strokeStyle = '#0006';
     ctx.lineWidth = 4;
-    ctx.strokeText('Hold to rappel', G.w * 0.44, G.h * 0.5 + bob);
-    ctx.fillText('Hold to rappel', G.w * 0.44, G.h * 0.5 + bob);
+    ctx.strokeText('Hold to rappel', G.w * 0.56, G.h * 0.5 + bob);
+    ctx.fillText('Hold to rappel', G.w * 0.56, G.h * 0.5 + bob);
     ctx.fillStyle = '#ffffffcc';
     ctx.font = `600 ${G.unit * 0.024}px 'Segoe UI', sans-serif`;
-    ctx.fillText('Release to stop · dodge the crystals', G.w * 0.44, G.h * 0.5 + G.unit * 0.05 + bob);
-    ctx.fillText('Tricks charge your Frenzy ⚡', G.w * 0.44, G.h * 0.5 + G.unit * 0.085 + bob);
+    ctx.fillText('Release to stop · dodge the crystals', G.w * 0.56, G.h * 0.5 + G.unit * 0.05 + bob);
+    ctx.fillText('Tricks charge your Frenzy ⚡', G.w * 0.56, G.h * 0.5 + G.unit * 0.085 + bob);
   }
 }
 
