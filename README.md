@@ -26,6 +26,7 @@ the network.
 | Balls | Ballz |
 | Nertz | Nertz / Pounce (public-domain card game) |
 | Jet Rush | Jetpack Joyride |
+| Rock Bottom | Radical Rappelling |
 
 ## Building from source
 

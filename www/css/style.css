@@ -626,3 +626,46 @@ body.home { background: linear-gradient(170deg, #ffeef5, #e8f4ff 55%, #fdf6e3); 
 }
 .jet-icon .jr-bolt.a { right: 16px; top: 4px; height: 16px; }
 .jet-icon .jr-bolt.b { right: 7px; bottom: 4px; height: 20px; }
+
+/* ---------- Rock Bottom ---------- */
+.tile-rock { background: linear-gradient(140deg, #6b4a35, #a85a33 60%, #ff8c42); }
+.rock-icon {
+  position: relative;
+  width: 62px; height: 46px;
+  background: #ffffff2e;
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* a mini cliff scene: wall, crystals, climber on a rope, lava rising below */
+.rock-icon .rb-wall {
+  position: absolute; right: 0; top: 0;
+  width: 14px; height: 100%;
+  background: #83593d;
+}
+.rock-icon .rb-spike {
+  position: absolute; right: 14px;
+  width: 0; height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 10px solid #b985f4;
+}
+.rock-icon .rb-spike.a { top: 5px; }
+.rock-icon .rb-spike.b { bottom: 9px; border-right-width: 14px; }
+.rock-icon .rb-rope {
+  position: absolute; left: 21px; top: 0;
+  width: 2px; height: 19px;
+  background: #f5e6c8;
+  transform: rotate(8deg);
+}
+.rock-icon .rb-guy {
+  position: absolute; left: 16px; top: 18px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: #5ede8f;
+  box-shadow: inset 0 4px 0 #ff9f4d;
+}
+.rock-icon .rb-lava {
+  position: absolute; left: 0; bottom: 0;
+  width: 100%; height: 7px;
+  background: linear-gradient(#ffd166, #ff5a2e);
+}

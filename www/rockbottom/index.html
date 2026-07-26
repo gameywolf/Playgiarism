@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Rock Bottom</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Rock Bottom</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Depth</div><div class="val" id="hudDist">0 m</div></div>
+    <div class="hud-box"><div class="label" style="white-space:nowrap">Best D/W/All</div><div class="val" id="hudBests" style="font-size:12px;white-space:nowrap">0/0/0</div></div>
+    <div class="hud-box"><div class="label">Coins</div><div class="val" id="hudCoins" style="font-size:14px">🪙 0</div></div>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Game over -->
+<div class="overlay" id="overOverlay">
+  <div class="dialog">
+    <h2 id="overTitle">Spiked!</h2>
+    <p>You made it down</p>
+    <p style="font-size:32px;color:var(--text)"><b id="finalDist">0</b> <span style="font-size:16px">m</span></p>
+    <p id="coinNote"></p>
+    <p id="recordNote"></p>
+    <div class="scores-row" id="finalBests"></div>
+    <button class="primary" id="restartBtn">Drop Again</button>
+  </div>
+</div>
+
+<script src="rockbottom.js"></script>
+</body>
+</html>
