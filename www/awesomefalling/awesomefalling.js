@@ -62,10 +62,8 @@ let held = false;
 let vy = 0;              // descent speed
 let px = 0, vx = 0;      // swing: distance from the wall face and outward velocity
 let lavaY = 0;           // world y of the lava front
-let feats = [];          // spikes / targets / pads / rings
+let feats = [];          // spikes / targets / pads / rings / clouds / pickups
 let coinsW = [];         // {wy, cpx, spin, gone}
-let boulders = [];       // {wy, cpx, r, rot}
-let warns = [];          // boulder warnings {t, ms, cpx}
 let sparks = [];         // {x, wy, vx, vy, t, life, col, size}
 let popups = [];         // {x, wy, txt, col, t}
 let genY = 0;            // spawn frontier (world y)
@@ -73,7 +71,7 @@ let charge = 0, frenzyT = 0;
 let ride = null;         // rainbow ride: bezier through (px, worldY) space
 let lastRide = null;     // finished ride kept around while its arc fades
 let rocketT = 0, magnetT = 0;
-let boulderT = 0;
+let worldIdx = 0;        // which biome band we're in, for the arrival popup
 let deathT = 0, deathCause = 'spike';
 let death = { x: 0, y: 0, vx: 0, vy: 0, spin: 0 };
 let runRecords = new Set();
@@ -128,13 +126,13 @@ function newGame() {
   held = false; vy = 0;
   px = G.A * 0.3; vx = G.kickV * 0.5;
   lavaY = -G.unit * 1.7;
-  feats = []; coinsW = []; boulders = []; warns = [];
+  feats = []; coinsW = [];
   sparks = []; popups = [];
   genY = G.unit * 0.9;   // breathing room before the first feature arrives
   charge = 0; frenzyT = 0;
   ride = null; lastRide = null;
   rocketT = 0; magnetT = 0;
-  boulderT = 6;
+  worldIdx = 0;
   deathT = 0;
   runRecords = new Set();
   while (genY < climberY + G.h * 2.2) spawnFeature();   // pre-fill the visible cliff
@@ -275,8 +273,9 @@ function padHit(pad) {
   pad.hit = true;
   pad.hitT = 1;
   pad.set.n++;
-  if (pad.set.n === 3) trick('Hop Chain!', 10, 0.26, G.wallX + pad.prot, pad.y);
-  else trick(`${pad.idx + 1}!`, 2, 0.08, G.wallX + pad.prot, pad.y);
+  // the chain pays out only when all three pads are hit — partial credit is nothing
+  if (pad.set.n === 3) trick('Hop Chain!', 16, 0.4, G.wallX + pad.prot, pad.y);
+  else popups.push({ x: G.wallX + pad.prot, wy: pad.y, txt: `${pad.set.n} of 3…`, col: '#8adf9c', t: 0 });
 }
 
 // ---------------- Death / finish ----------------
@@ -308,7 +307,7 @@ function finishRun() {
   if (coins) localStorage.setItem(COIN_KEY, String(lifetimeCoins() + coins));
   updateBestsHud();
   document.getElementById('overTitle').textContent =
-    { spike: 'Spiked!', lava: 'Toasted!', boulder: 'Squashed!' }[deathCause] || 'Wiped out!';
+    { spike: 'Spiked!', lava: 'Toasted!' }[deathCause] || 'Wiped out!';
   document.getElementById('finalDist').textContent = dist;
   document.getElementById('coinNote').textContent =
     coins ? `🪙 ${coins} coins  ·  lifetime ${lifetimeCoins()}` : '';
@@ -350,6 +349,7 @@ function update(dtms) {
   if (phase === 'over') return;
 
   // ---- swing (runs in 'ready' too, so the climber dangles invitingly) ----
+  const pxPrev = px;
   if (!ride) {
     vx -= G.gPull * dt;
     px += vx * dt;
@@ -405,6 +405,14 @@ function update(dtms) {
   }
   const m = Math.floor(Math.max(0, climberY) / PXPM()) + bonus;
   if (m !== dist) { dist = m; updateHud(); }
+  const wIdx = Math.floor(dist / WORLD_M);
+  if (wIdx !== worldIdx) {
+    worldIdx = wIdx;
+    popups.push({
+      x: G.wallX + G.A * 0.7, wy: climberY + G.unit * 0.14,
+      txt: WORLDS[wIdx % WORLDS.length].name + '!', col: '#ffffff', t: 0,
+    });
+  }
 
   // ---- lava ----
   let sp = lavaSpd();
@@ -416,23 +424,6 @@ function update(dtms) {
 
   // ---- spawn ----
   while (genY < climberY + G.h * 2.2) spawnFeature();
-  if (dist > 120) {
-    boulderT -= dt;
-    if (boulderT <= 0) {
-      // lanes hug the wall so a full swing-out always clears them
-      warns.push({ t: 0, ms: 850, cpx: G.A * (0.05 + Math.random() * 0.17) });
-      boulderT = Math.max(3.5, 8 - dist / 300) * (0.7 + Math.random() * 0.6);
-    }
-  }
-  for (const w of warns) {
-    w.t += dtms;
-    if (w.t >= w.ms) {
-      // spawned a full swing-period's worth of approach above the climber, so
-      // modulating descent speed can always shift the pass into a safe phase
-      boulders.push({ wy: climberY - u * 1.15, cpx: w.cpx, r: u * 0.05, rot: 0 });
-    }
-  }
-  warns = warns.filter(w => w.t < w.ms);
 
   // ---- hazards ----
   if (!shielded) {
@@ -442,20 +433,13 @@ function update(dtms) {
           px < f.len) return die('spike');
     }
   }
-  for (const b of boulders) {
-    b.wy += u * 2.1 * dt;
-    b.rot += dt * 4;
-    if (!shielded &&
-        Math.abs(b.wy - climberY) < b.r + G.bodyR * 0.8 &&
-        Math.abs(px - b.cpx) < b.r + G.bodyR * 0.7) return die('boulder');
-  }
-  boulders = boulders.filter(b => b.wy < camY() + G.h + u * 0.2);
-
   // ---- rings, clouds and pickups ----
   for (const f of feats) {
     if (f.got) continue;
     if (f.kind === 'ring' &&
-        prevY <= f.y && climberY > f.y && Math.abs(px - f.cx) < f.hw) {
+        Math.abs(climberY - f.y) < f.hw * 0.75 &&
+        ((pxPrev <= f.cx && px > f.cx) || (pxPrev >= f.cx && px < f.cx))) {
+      // the hoop stands upright: you step into it as the swing carries you across
       f.got = true;
       trick('Hoop!', 5, 0.2, G.wallX + f.cx, f.y);
     } else if (f.kind === 'cloud' && !ride &&
@@ -521,12 +505,35 @@ function lerpCol(a, b, k) {
   return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * k).toString(16).padStart(2, '0')).join('');
 }
 
+// ---------------- Worlds ----------------
+// every WORLD_M metres the palette shifts to the next biome (cycling), blended
+// over the final 40 m of each band so the change rolls in rather than popping
+const WORLD_M = 300;
+const WORLDS = [
+  { name: 'Sunny Cliffs',   skyTop: '#8fd0ff', skyMid: '#b9e2ff', skyBot: '#e6f4ff', wallA: '#96704f', wallB: '#83593d', wallC: '#6d4a35', far: '#a2bdd8', farBand: '#8aa8c6', cry: '#b985f4', cryLit: '#d9b8ff', cryDark: '#a06fe0' },
+  { name: 'Deep Jungle',    skyTop: '#4fae8a', skyMid: '#7fd0a8', skyBot: '#d8f2c8', wallA: '#6f7a42', wallB: '#5c6836', wallC: '#47522a', far: '#8fbf9f', farBand: '#74a687', cry: '#3fc46f', cryLit: '#8ce8a8', cryDark: '#2c9a52' },
+  { name: 'Frozen Falls',   skyTop: '#a8d8f0', skyMid: '#cfeaf8', skyBot: '#f0faff', wallA: '#8fa8c2', wallB: '#7591b0', wallC: '#5d7896', far: '#c2d8ea', farBand: '#a8c2da', cry: '#5fd8f0', cryLit: '#b8f0fa', cryDark: '#3ab0d0' },
+  { name: 'Magma Core',     skyTop: '#4a2438', skyMid: '#7a3a3a', skyBot: '#c2603a', wallA: '#5a4038', wallB: '#463028', wallC: '#32211c', far: '#6a4a4a', farBand: '#523838', cry: '#ff7043', cryLit: '#ffb08a', cryDark: '#d84a2a' },
+  { name: 'Crystal Depths', skyTop: '#2b1b4e', skyMid: '#4a2b6e', skyBot: '#7a4a8e', wallA: '#5a4a72', wallB: '#463858', wallC: '#332842', far: '#6a5a86', farBand: '#544672', cry: '#ff5ec8', cryLit: '#ffb0e8', cryDark: '#d03aa0' },
+];
+let PAL = WORLDS[0];
+function worldPal() {
+  const d = Math.max(0, dist);
+  const idx = Math.floor(d / WORLD_M);
+  const cur = WORLDS[idx % WORLDS.length];
+  const nxt = WORLDS[(idx + 1) % WORLDS.length];
+  const k = Math.max(0, d - idx * WORLD_M - (WORLD_M - 40)) / 40;
+  if (k <= 0) return cur;
+  const out = { name: cur.name };
+  for (const key in cur) if (key !== 'name') out[key] = lerpCol(cur[key], nxt[key], k);
+  return out;
+}
+
 function drawSky() {
-  const k = Math.min(1, dist / 1200);   // deeper = duskier
   const g = ctx.createLinearGradient(0, 0, 0, G.h);
-  g.addColorStop(0, lerpCol('#8fd0ff', '#31215e', k));
-  g.addColorStop(0.55, lerpCol('#b9e2ff', '#6d4a86', k));
-  g.addColorStop(1, lerpCol('#e6f4ff', '#c96f8a', k));
+  g.addColorStop(0, PAL.skyTop);
+  g.addColorStop(0.55, PAL.skyMid);
+  g.addColorStop(1, PAL.skyBot);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, G.w, G.h);
 
@@ -560,14 +567,14 @@ function edgePoints(baseX, sign, chunk, para, jag) {
 
 function drawFarCliff() {
   const pts = edgePoints(G.w * 0.92, -1, G.unit * 0.14, 0.35, G.w * 0.03);
-  ctx.fillStyle = '#a2bdd8';
+  ctx.fillStyle = PAL.far;
   ctx.beginPath();
   ctx.moveTo(G.w, -10);
   for (const [x, y] of pts) ctx.lineTo(x, y);
   ctx.lineTo(G.w, G.h + 10);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#8aa8c6';
+  ctx.fillStyle = PAL.farBand;
   const cy = camY() * 0.35;
   for (let i = Math.floor(cy / (G.unit * 0.3)); i * G.unit * 0.3 < cy + G.h; i++) {
     if (hash(i * 7.7) < 0.5) continue;
@@ -579,9 +586,9 @@ function drawFarCliff() {
 function drawWall() {
   const pts = edgePoints(G.wallX, 1, G.unit * 0.09, 1, G.w * 0.025);
   const g = ctx.createLinearGradient(G.wallX + G.w * 0.03, 0, 0, 0);
-  g.addColorStop(0, '#96704f');
-  g.addColorStop(0.4, '#83593d');
-  g.addColorStop(1, '#6d4a35');
+  g.addColorStop(0, PAL.wallA);
+  g.addColorStop(0.4, PAL.wallB);
+  g.addColorStop(1, PAL.wallC);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(-10, -10);
@@ -613,7 +620,7 @@ function drawWall() {
 function drawSpike(f) {
   const y = f.y - camY();
   const tip = G.wallX + f.len;
-  ctx.fillStyle = '#b985f4';
+  ctx.fillStyle = PAL.cry;
   ctx.beginPath();
   ctx.moveTo(G.wallX - 2, y - f.h / 2);
   ctx.lineTo(tip, y);
@@ -621,7 +628,7 @@ function drawSpike(f) {
   ctx.closePath();
   ctx.fill();
   // lit facet
-  ctx.fillStyle = '#d9b8ff';
+  ctx.fillStyle = PAL.cryLit;
   ctx.beginPath();
   ctx.moveTo(G.wallX - 2, y - f.h / 2);
   ctx.lineTo(tip, y);
@@ -629,7 +636,7 @@ function drawSpike(f) {
   ctx.closePath();
   ctx.fill();
   // little sister crystal
-  ctx.fillStyle = '#a06fe0';
+  ctx.fillStyle = PAL.cryDark;
   ctx.beginPath();
   ctx.moveTo(G.wallX - 2, y + f.h * 0.2);
   ctx.lineTo(G.wallX + f.len * 0.4, y + f.h * 0.42);
@@ -696,20 +703,21 @@ function drawRing(f) {
   const x = G.wallX + f.cx;
   ctx.save();
   ctx.translate(x, y);
+  // upright hoop, seen nearly edge-on: tall and narrow
   ctx.strokeStyle = '#f0a92e';
   ctx.lineWidth = Math.max(3, G.unit * 0.012);
   ctx.beginPath();
-  ctx.ellipse(0, 0, f.hw, f.hw * 0.32, 0, 0, 7);
+  ctx.ellipse(0, 0, f.hw * 0.3, f.hw, 0, 0, 7);
   ctx.stroke();
   ctx.strokeStyle = '#ffd166';
   ctx.lineWidth = Math.max(1.5, G.unit * 0.005);
   ctx.beginPath();
-  ctx.ellipse(0, -G.unit * 0.003, f.hw * 0.92, f.hw * 0.27, 0, Math.PI, Math.PI * 2);
+  ctx.ellipse(-G.unit * 0.003, 0, f.hw * 0.26, f.hw * 0.92, 0, Math.PI * 0.5, Math.PI * 1.5);
   ctx.stroke();
   const a = pulse / 260 + f.y;
   ctx.fillStyle = '#fff7d9';
   ctx.beginPath();
-  ctx.arc(Math.cos(a) * f.hw, Math.sin(a) * f.hw * 0.32, G.unit * 0.005, 0, 7);
+  ctx.arc(Math.cos(a) * f.hw * 0.3, Math.sin(a) * f.hw, G.unit * 0.005, 0, 7);
   ctx.fill();
   ctx.restore();
 }
@@ -731,35 +739,6 @@ function drawCoin(c) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('$', 0, r * 0.06);
-  ctx.restore();
-}
-
-function drawBoulder(b) {
-  const y = b.wy - camY();
-  const x = G.wallX + b.cpx;
-  if (y < -b.r) {   // still above the screen — keep flashing where it will fall
-    drawWarnMarker(x, pulse);
-    return;
-  }
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(b.rot);
-  ctx.fillStyle = '#8a6a4d';
-  ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2;
-    const rr = b.r * (0.85 + hash(i * 3.7) * 0.3);
-    (i ? ctx.lineTo : ctx.moveTo).call(ctx, Math.cos(a) * rr, Math.sin(a) * rr);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#00000030';
-  ctx.lineWidth = Math.max(1.5, G.unit * 0.004);
-  ctx.beginPath();
-  ctx.moveTo(-b.r * 0.4, -b.r * 0.2);
-  ctx.lineTo(0, b.r * 0.15);
-  ctx.lineTo(b.r * 0.35, -b.r * 0.1);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -848,27 +827,6 @@ function drawRideArc(r, fadeK) {
   ctx.globalAlpha = 1;
 }
 
-function drawWarn(w) { drawWarnMarker(G.wallX + w.cpx, w.t); }
-
-function drawWarnMarker(x, t) {
-  const on = Math.floor(t / 130) % 2 === 0;
-  const s = G.unit * 0.05;
-  ctx.globalAlpha = on ? 1 : 0.55;
-  ctx.fillStyle = '#ff5e7e';
-  ctx.beginPath();
-  ctx.moveTo(x - s, G.h * 0.02);
-  ctx.lineTo(x + s, G.h * 0.02);
-  ctx.lineTo(x, G.h * 0.02 + s * 1.4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = `800 ${s}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('!', x, G.h * 0.02 + s * 0.5);
-  ctx.globalAlpha = 1;
-}
-
 function drawClimber() {
   const dying = phase === 'dying';
   const x = dying ? death.x : G.wallX + px;
@@ -883,6 +841,13 @@ function drawClimber() {
     ctx.beginPath();
     ctx.moveTo(ax, -G.h * 0.03);
     ctx.quadraticCurveTo((ax + x) / 2 - px * 0.14, y * 0.45, x, y - r * 1.1);
+    ctx.stroke();
+    // …and the free end runs on below the harness, swaying behind the swing,
+    // like a real rappel line
+    ctx.lineWidth = Math.max(1.5, G.unit * 0.004);
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 0.35);
+    ctx.quadraticCurveTo(x - vx * 0.06, y + G.h * 0.2, x - vx * 0.1, y + G.h * 0.45);
     ctx.stroke();
   }
 
@@ -1023,6 +988,7 @@ function drawMeter() {
 
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  PAL = worldPal();
   drawSky();
   drawFarCliff();
   drawWall();
@@ -1039,12 +1005,10 @@ function draw() {
     else if (f.kind === 'magnet') drawMagnetItem(f);
   }
   for (const c of coinsW) drawCoin(c);
-  for (const b of boulders) drawBoulder(b);
   if (ride) drawRideArc(ride, 0);
   else if (lastRide) drawRideArc(lastRide, lastRide.fade / 500);
   drawClimber();
   drawLava();
-  for (const w of warns) drawWarn(w);
 
   for (const s of sparks) {
     const k = s.t / s.life;

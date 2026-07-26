@@ -87,14 +87,18 @@ scraping the originals' servers or APIs.
     from amplitude + period (`kickV`/`gPull` in `layout()`), hold to descend, release to
     stop; time descents at the swing apex to clear purple crystals of varying protrusion.
     Lava chases from above with rubber-banding (speeds up when >1.35 screens behind,
-    clamped to 2.2 so stalling is always punished). Tricks — hoops to fall through,
-    bullseyes hit on wall contact, 1-2-3 bounce-pad hop chains, and rainbow-ride clouds
-    (brush one to be carried down a bezier rainbow arc) — grant bonus metres and
-    charge a Frenzy meter (invulnerable fast descent). Pickups: rocket (1.5 s
-    invulnerable 1.8× descent) and magnet (8 s coin attraction). Boulders fall along the wall after
-    a flashing warning from 120 m — spawned ~1.15 screen-heights above the climber so
-    modulating descent speed can shift the pass-moment by more than one swing period
-    (i.e. a safe swing phase is always reachable; don't shrink that spawn gap). Score = metres descended incl. trick bonuses, best
+    clamped to 2.2 so stalling is always punished). Tricks — upright hoops the swing
+    carries you through (park at their height; the crossing happens on its own),
+    bullseyes hit on wall contact, 1-2-3 bounce-pad hop chains (pay out ONLY when all
+    three are hit — partial hits show "n of 3…" and are worth nothing; Ben's call), and
+    rainbow-ride clouds (brush one to be carried down a bezier rainbow arc) — grant
+    bonus metres and charge a Frenzy meter (invulnerable fast descent). Pickups:
+    rocket (1.5 s invulnerable 1.8× descent) and magnet (8 s coin attraction).
+    No falling boulders — they were built and Ben had them removed (vertical-only
+    control made them feel undodgeable); don't reintroduce them. Worlds cycle every
+    300 m (Sunny Cliffs → Deep Jungle → Frozen Falls → Magma Core → Crystal Depths),
+    palettes blended over each band's last 40 m; the rope's free end hangs below the
+    climber like a real rappel line. Score = metres descended incl. trick bonuses, best
     D/W/all under `awesomefalling.scores.v1`, lifetime coins under
     `awesomefalling.coins.v1`. No mid-run resume)
   - `www/nertz/` — Nertz (real-time solitaire race: you + 3 CPUs, each with a 13-card Nertz pile, 4 work piles, and a 3-at-a-time stock, all racing simultaneously onto shared centre foundations built up by suit from the Ace; no turns — CPUs act on difficulty-scaled timers (Easy/Medium/Hard = speed + skill); tap a card to send it to the centre, drag to move onto your piles; empty your Nertz pile to end the round; +1 per card sent to centre, -2 per card left in Nertz pile; match to 100; state under `nertz.state.v1`)
