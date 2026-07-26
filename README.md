@@ -28,6 +28,7 @@ the network.
 | Jet Rush | Jetpack Joyride |
 | Awesome Falling | Radical Rappelling |
 | Ricochet | Peggle |
+| Lawn Defense | Plants vs. Zombies |
 
 ## Building from source
 

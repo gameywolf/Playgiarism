@@ -101,6 +101,25 @@ scraping the originals' servers or APIs.
     climber like a real rappel line. Score = metres descended incl. trick bonuses, best
     D/W/all under `awesomefalling.scores.v1`, lifetime coins under
     `awesomefalling.coins.v1`. No mid-run resume)
+  - `www/lawn/` — Lawn Defense (Plants vs. Zombies clone: five lanes, seed packets with
+    sun costs and per-packet cooldowns, shamblers that stop to chew whatever is in front
+    of them, one single-use mower per lane as the last line, second breach in a lane ends
+    the run. **The lanes run top-to-bottom, not side-on** — the genre's usual landscape
+    lane is unplayable on a phone, so shamblers walk down, plants shoot up, mowers sit
+    along the bottom. Six plants unlock by level (Sunbloom/Pea Pod → Barknut → Boom Berry
+    → Frost Pod → Twin Pod), four shambler types unlock the same way.
+    `ZOMBIES[].speed` is the balance-critical number: it's in rows per second, and a
+    standard shambler crossing the eight rows in ~36s is just longer than one Pea Pod
+    (14 dps) needs to chew through its 200 hp. Push it past ~0.3 and one shooter per lane
+    stops holding a lane, which makes the early levels unwinnable — an early cut used 0.30
+    and a scripted bot couldn't clear level 2. Every level starts from bare lawn while the
+    waves get thicker, so `startSun()` and `prepMs()` ramp with level to stand in for the
+    garden you'd otherwise carry over; without them a run stalls at level 4 however well
+    it's played. Waves come from a seeded generator (`buildWaves`) so level N is the same
+    fight every time; wave *count* grows every third level because every second was a
+    cliff. Score carries across levels
+    within a run but rolls back to `checkpoint` on a retry, so a failed level can't be
+    farmed. Progress under `lawn.state.v1`, bests D/W/all under `lawn.scores.v1`)
   - `www/nertz/` — Nertz (real-time solitaire race: you + 3 CPUs, each with a 13-card Nertz pile, 4 work piles, and a 3-at-a-time stock, all racing simultaneously onto shared centre foundations built up by suit from the Ace; no turns — CPUs act on difficulty-scaled timers (Easy/Medium/Hard = speed + skill); tap a card to send it to the centre, drag to move onto your piles; empty your Nertz pile to end the round; +1 per card sent to centre, -2 per card left in Nertz pile; match to 100; state under `nertz.state.v1`)
 - Photos come from the `@capacitor/camera` plugin when running natively, with an
   `<input type=file>` fallback so the games also work in a desktop browser for testing.
