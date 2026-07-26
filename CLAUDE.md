@@ -88,8 +88,10 @@ scraping the originals' servers or APIs.
     stop; time descents at the swing apex to clear purple crystals of varying protrusion.
     Lava chases from above with rubber-banding (speeds up when >1.35 screens behind,
     clamped to 2.2 so stalling is always punished). Tricks — hoops to fall through,
-    bullseyes hit on wall contact, 1-2-3 bounce-pad hop chains — grant bonus metres and
-    charge a Frenzy meter (invulnerable fast descent). Boulders fall along the wall after
+    bullseyes hit on wall contact, 1-2-3 bounce-pad hop chains, and rainbow-ride clouds
+    (brush one to be carried down a bezier rainbow arc) — grant bonus metres and
+    charge a Frenzy meter (invulnerable fast descent). Pickups: rocket (1.5 s
+    invulnerable 1.8× descent) and magnet (8 s coin attraction). Boulders fall along the wall after
     a flashing warning from 120 m — spawned ~1.15 screen-heights above the climber so
     modulating descent speed can shift the pass-moment by more than one swing period
     (i.e. a safe swing phase is always reachable; don't shrink that spawn gap). Score = metres descended incl. trick bonuses, best

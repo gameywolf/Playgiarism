@@ -70,6 +70,9 @@ let sparks = [];         // {x, wy, vx, vy, t, life, col, size}
 let popups = [];         // {x, wy, txt, col, t}
 let genY = 0;            // spawn frontier (world y)
 let charge = 0, frenzyT = 0;
+let ride = null;         // rainbow ride: bezier through (px, worldY) space
+let lastRide = null;     // finished ride kept around while its arc fades
+let rocketT = 0, magnetT = 0;
 let boulderT = 0;
 let deathT = 0, deathCause = 'spike';
 let death = { x: 0, y: 0, vx: 0, vy: 0, spin: 0 };
@@ -129,6 +132,8 @@ function newGame() {
   sparks = []; popups = [];
   genY = G.unit * 0.9;   // breathing room before the first feature arrives
   charge = 0; frenzyT = 0;
+  ride = null; lastRide = null;
+  rocketT = 0; magnetT = 0;
   boulderT = 6;
   deathT = 0;
   runRecords = new Set();
@@ -169,18 +174,18 @@ function spawnFeature() {
       feats.push(spike(genY + i * u * 0.14, G.A * (0.2 + Math.random() * 0.45)));
     }
     used = u * 0.14 * (n - 1) + u * 0.08;
-  } else if (roll < 0.58) {
+  } else if (roll < 0.54) {
     // hoop floating off the wall — fall through it for charge
     feats.push({
       kind: 'ring', y: genY + u * 0.07,
       cx: G.A * (0.4 + Math.random() * 0.45), hw: u * 0.075, got: false,
     });
     used = u * 0.15;
-  } else if (roll < 0.68) {
+  } else if (roll < 0.62) {
     // bullseye painted on the wall — touch down inside it
     feats.push({ kind: 'target', y: genY + u * 0.05, h: u * 0.1, used: false });
     used = u * 0.11;
-  } else if (roll < 0.80 && stage >= 1) {
+  } else if (roll < 0.72 && stage >= 1) {
     // hop chain: three numbered pads that bounce you like the wall does
     const set = { n: 0 };
     for (let i = 0; i < 3; i++) {
@@ -190,6 +195,21 @@ function spawnFeature() {
       });
     }
     used = u * 0.5;
+  } else if (roll < 0.80) {
+    // cloud — brush it to ride a rainbow down the wall
+    feats.push({
+      kind: 'cloud', y: genY + u * 0.08,
+      cx: G.A * (0.45 + Math.random() * 0.4), r: u * 0.05, got: false,
+    });
+    used = u * 0.16;
+  } else if (roll < 0.85 && stage >= 1) {
+    // rocket boost pickup: short invulnerable burst of speed
+    feats.push({ kind: 'rocket', y: genY + u * 0.06, cx: G.A * (0.35 + Math.random() * 0.45), got: false });
+    used = u * 0.12;
+  } else if (roll < 0.89 && stage >= 1) {
+    // magnet pickup: coins fly to you for a while
+    feats.push({ kind: 'magnet', y: genY + u * 0.06, cx: G.A * (0.35 + Math.random() * 0.45), got: false });
+    used = u * 0.12;
   } else {
     // coin trail drifting with the swing
     const n = 4 + ((Math.random() * 4) | 0);
@@ -330,25 +350,28 @@ function update(dtms) {
   if (phase === 'over') return;
 
   // ---- swing (runs in 'ready' too, so the climber dangles invitingly) ----
-  vx -= G.gPull * dt;
-  px += vx * dt;
-  if (phase === 'run' && vx < 0) {
-    for (const f of feats) {
-      if (f.kind === 'pad' && !f.hit && px <= f.prot &&
-          Math.abs(climberY - f.y) < f.h / 2 + G.bodyR * 0.5) {
-        px = f.prot;
-        vx = G.kickV;
-        padHit(f);
-        break;
+  if (!ride) {
+    vx -= G.gPull * dt;
+    px += vx * dt;
+    if (phase === 'run' && vx < 0) {
+      for (const f of feats) {
+        if (f.kind === 'pad' && !f.hit && px <= f.prot &&
+            Math.abs(climberY - f.y) < f.h / 2 + G.bodyR * 0.5) {
+          px = f.prot;
+          vx = G.kickV;
+          padHit(f);
+          break;
+        }
       }
     }
-  }
-  if (px <= 0 && vx < 0) {
-    px = 0;
-    vx = G.kickV;
-    if (phase === 'run') onWallContact();
+    if (px <= 0 && vx < 0) {
+      px = 0;
+      vx = G.kickV;
+      if (phase === 'run') onWallContact();
+    }
   }
   for (const f of feats) if (f.hitT > 0) f.hitT = Math.max(0, f.hitT - dt * 3);
+  if (lastRide) { lastRide.fade += dtms; if (lastRide.fade > 500) lastRide = null; }
 
   if (phase !== 'run') return;
 
@@ -356,10 +379,30 @@ function update(dtms) {
   const frenzy = frenzyT > 0;
   if (frenzy) frenzyT -= dtms;
   if (frenzy && frenzyT <= 0) charge = 0;
-  const wantV = frenzy ? maxVy() * 1.4 : held ? maxVy() : 0;
-  vy += (wantV - vy) * Math.min(1, dt * 7);
+  if (rocketT > 0) rocketT -= dtms;
+  if (magnetT > 0) magnetT -= dtms;
+  const shielded = frenzy || rocketT > 0 || !!ride;
   prevY = climberY;
-  climberY += vy * dt;
+  if (ride) {
+    // carried along the rainbow: swing physics is suspended for the arc
+    ride.t += dtms;
+    const k = Math.min(1, ride.t / ride.dur);
+    const bez = (a, b, c) => (1 - k) * (1 - k) * a + 2 * (1 - k) * k * b + k * k * c;
+    px = bez(ride.p0x, ride.cxp, ride.p1x);
+    climberY = bez(ride.p0y, ride.cyp, ride.p1y);
+    vy = maxVy();
+    if (k >= 1) {
+      lastRide = ride;
+      lastRide.fade = 0;
+      ride = null;
+      vx = G.kickV * 0.7;
+      rocketT = Math.max(rocketT, 350);   // grace so the drop-off can't dump you on a crystal
+    }
+  } else {
+    const wantV = rocketT > 0 ? maxVy() * 1.8 : frenzy ? maxVy() * 1.4 : held ? maxVy() : 0;
+    vy += (wantV - vy) * Math.min(1, dt * 7);
+    climberY += vy * dt;
+  }
   const m = Math.floor(Math.max(0, climberY) / PXPM()) + bonus;
   if (m !== dist) { dist = m; updateHud(); }
 
@@ -368,7 +411,7 @@ function update(dtms) {
   if (climberY - lavaY > u * 1.35) sp *= 1.7;   // rubber-band so it always looms
   lavaY += sp * dt;
   if (climberY - lavaY > u * 2.2) lavaY = climberY - u * 2.2;
-  if (frenzy) lavaY = Math.min(lavaY, climberY - u * 0.3);
+  if (shielded) lavaY = Math.min(lavaY, climberY - u * 0.3);
   else if (lavaY >= climberY - G.bodyR) return die('lava');
 
   // ---- spawn ----
@@ -392,7 +435,7 @@ function update(dtms) {
   warns = warns.filter(w => w.t < w.ms);
 
   // ---- hazards ----
-  if (!frenzy) {
+  if (!shielded) {
     for (const f of feats) {
       if (f.kind === 'spike' &&
           Math.abs(climberY - f.y) < f.h * 0.4 + G.bodyR * 0.6 &&
@@ -402,25 +445,53 @@ function update(dtms) {
   for (const b of boulders) {
     b.wy += u * 2.1 * dt;
     b.rot += dt * 4;
-    if (!frenzy &&
+    if (!shielded &&
         Math.abs(b.wy - climberY) < b.r + G.bodyR * 0.8 &&
         Math.abs(px - b.cpx) < b.r + G.bodyR * 0.7) return die('boulder');
   }
   boulders = boulders.filter(b => b.wy < camY() + G.h + u * 0.2);
 
-  // ---- rings ----
+  // ---- rings, clouds and pickups ----
   for (const f of feats) {
-    if (f.kind === 'ring' && !f.got &&
+    if (f.got) continue;
+    if (f.kind === 'ring' &&
         prevY <= f.y && climberY > f.y && Math.abs(px - f.cx) < f.hw) {
       f.got = true;
       trick('Hoop!', 5, 0.2, G.wallX + f.cx, f.y);
+    } else if (f.kind === 'cloud' && !ride &&
+        Math.abs(px - f.cx) < f.r + G.bodyR && Math.abs(climberY - f.y) < f.r + G.bodyR) {
+      f.got = true;
+      ride = {
+        t: 0, dur: 800, fade: 0,
+        p0x: px, p0y: climberY,
+        cxp: px + G.A * 0.25, cyp: climberY + u * 0.5,
+        p1x: G.A * 0.35, p1y: climberY + u * 0.95,
+      };
+      trick('Rainbow!', 6, 0.18, G.wallX + px, climberY);
+    } else if (f.kind === 'rocket' &&
+        Math.abs(px - f.cx) < G.bodyR + u * 0.03 && Math.abs(climberY - f.y) < G.bodyR + u * 0.03) {
+      f.got = true;
+      rocketT = 1500;
+      trick('Rocket!', 4, 0.1, G.wallX + f.cx, f.y);
+    } else if (f.kind === 'magnet' &&
+        Math.abs(px - f.cx) < G.bodyR + u * 0.03 && Math.abs(climberY - f.y) < G.bodyR + u * 0.03) {
+      f.got = true;
+      magnetT = 8000;
+      popups.push({ x: G.wallX + f.cx, wy: f.y, txt: 'Magnet!', col: '#7be9ff', t: 0 });
     }
   }
-  feats = feats.filter(f => f.y > camY() - u * 0.3 && !(f.kind === 'ring' && f.got));
+  feats = feats.filter(f => f.y > camY() - u * 0.3 && !f.got);
 
   // ---- coins ----
   for (const c of coinsW) {
     c.spin += dt * 4;
+    if (magnetT > 0 && !c.gone) {
+      const dxp = px - c.cpx, dyp = climberY - c.wy;
+      if (Math.hypot(dxp, dyp) < u * 0.32) {
+        c.cpx += dxp * Math.min(1, dt * 8);
+        c.wy += dyp * Math.min(1, dt * 8);
+      }
+    }
     if (!c.gone && Math.hypot(c.cpx - px, c.wy - climberY) < G.bodyR + u * 0.028) {
       c.gone = true;
       const v = frenzy ? 2 : 1;
@@ -431,12 +502,14 @@ function update(dtms) {
   }
   coinsW = coinsW.filter(c => !c.gone && c.wy > camY() - u * 0.1);
 
-  // frenzy trail
-  if (frenzy) {
+  // frenzy / rainbow / rocket trail
+  if (frenzy || ride || rocketT > 0) {
     sparks.push({
       x: G.wallX + px + (Math.random() - 0.5) * G.bodyR, wy: climberY - G.bodyR,
       vx: (Math.random() - 0.5) * u * 0.1, vy: -u * (0.1 + Math.random() * 0.2),
-      t: 0, life: 400, col: `hsl(${(pulse / 3) % 360},90%,65%)`, size: u * 0.007,
+      t: 0, life: 400,
+      col: rocketT > 0 && !ride ? '#ff8c42' : `hsl(${(pulse / 3) % 360},90%,65%)`,
+      size: u * 0.007,
     });
   }
 }
@@ -690,6 +763,91 @@ function drawBoulder(b) {
   ctx.restore();
 }
 
+function drawCloud(f) {
+  const y = f.y - camY() + Math.sin(pulse / 400 + f.y) * G.unit * 0.008;
+  const x = G.wallX + f.cx;
+  const r = f.r;
+  ctx.fillStyle = '#ffffffdd';
+  ctx.beginPath();
+  for (let k = -1; k <= 1; k++) {
+    const kw = r * (1 - Math.abs(k) * 0.3);
+    ctx.ellipse(x + k * r * 0.8, y + Math.abs(k) * r * 0.12, kw, kw * 0.62, 0, 0, 7);
+  }
+  ctx.fill();
+  // rainbow hint peeking out of the cloud
+  const cols = ['#ff5e5e', '#ffe14d', '#4dc0ff'];
+  for (let i = 0; i < 3; i++) {
+    ctx.strokeStyle = cols[i];
+    ctx.lineWidth = Math.max(1.5, G.unit * 0.004);
+    ctx.beginPath();
+    ctx.arc(x, y + r * 0.3, r * (0.85 - i * 0.16), Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  }
+}
+
+function drawRocketItem(f) {
+  const y = f.y - camY();
+  const x = G.wallX + f.cx;
+  const s = G.unit * 0.028;
+  ctx.fillStyle = `rgba(255,209,102,${0.2 + 0.15 * Math.sin(pulse / 200)})`;
+  ctx.beginPath(); ctx.arc(x, y, s * 2.1, 0, 7); ctx.fill();
+  ctx.save();
+  ctx.translate(x, y);
+  // pointing down — it wants to take you that way
+  ctx.fillStyle = '#d8dbe8';
+  ctx.beginPath();
+  ctx.roundRect(-s * 0.4, -s * 0.9, s * 0.8, s * 1.4, s * 0.35);
+  ctx.fill();
+  ctx.fillStyle = '#ff5e7e';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.4, s * 0.5); ctx.lineTo(0, s * 1.2); ctx.lineTo(s * 0.4, s * 0.5);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8b90a8';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.4, -s * 0.5); ctx.lineTo(-s * 0.95, -s * 1.05); ctx.lineTo(-s * 0.4, -s * 0.15);
+  ctx.moveTo(s * 0.4, -s * 0.5); ctx.lineTo(s * 0.95, -s * 1.05); ctx.lineTo(s * 0.4, -s * 0.15);
+  ctx.fill();
+  ctx.fillStyle = '#7be9ff';
+  ctx.beginPath(); ctx.arc(0, -s * 0.25, s * 0.24, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawMagnetItem(f) {
+  const y = f.y - camY();
+  const x = G.wallX + f.cx;
+  const s = G.unit * 0.026;
+  ctx.fillStyle = `rgba(123,233,255,${0.2 + 0.15 * Math.sin(pulse / 200)})`;
+  ctx.beginPath(); ctx.arc(x, y, s * 2.1, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#ff5e5e';
+  ctx.lineWidth = s * 0.7;
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.25, s * 0.85, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#ff5e5e';
+  ctx.fillRect(x - s * 1.2, y - s * 0.3, s * 0.7, s * 0.8);
+  ctx.fillRect(x + s * 0.5, y - s * 0.3, s * 0.7, s * 0.8);
+  ctx.fillStyle = '#f4f7ff';
+  ctx.fillRect(x - s * 1.2, y + s * 0.2, s * 0.7, s * 0.45);
+  ctx.fillRect(x + s * 0.5, y + s * 0.2, s * 0.7, s * 0.45);
+}
+
+function drawRideArc(r, fadeK) {
+  const lw = Math.max(2, G.unit * 0.008);
+  const cols = ['#ff5e5e', '#ffb14d', '#ffe14d', '#67d97c', '#4dc0ff', '#b985f4'];
+  ctx.globalAlpha = 0.85 * (1 - fadeK);
+  for (let i = 0; i < cols.length; i++) {
+    ctx.strokeStyle = cols[i];
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(G.wallX + r.p0x, r.p0y - camY() + i * lw);
+    ctx.quadraticCurveTo(
+      G.wallX + r.cxp, r.cyp - camY() + i * lw,
+      G.wallX + r.p1x, r.p1y - camY() + i * lw);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawWarn(w) { drawWarnMarker(G.wallX + w.cpx, w.t); }
 
 function drawWarnMarker(x, t) {
@@ -855,6 +1013,12 @@ function drawMeter() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('⚡', x + w / 2, top + hh + u * 0.008);
+  if (magnetT > 0) {
+    // blink when it's about to run out
+    ctx.globalAlpha = magnetT < 1600 ? 0.4 + 0.6 * Math.abs(Math.sin(pulse / 140)) : 1;
+    ctx.fillText('🧲', x + w / 2, top - u * 0.042);
+    ctx.globalAlpha = 1;
+  }
 }
 
 function draw() {
@@ -868,9 +1032,16 @@ function draw() {
     else if (f.kind === 'pad') drawPad(f);
   }
   for (const f of feats) if (f.kind === 'spike') drawSpike(f);
-  for (const f of feats) if (f.kind === 'ring') drawRing(f);
+  for (const f of feats) {
+    if (f.kind === 'ring') drawRing(f);
+    else if (f.kind === 'cloud') drawCloud(f);
+    else if (f.kind === 'rocket') drawRocketItem(f);
+    else if (f.kind === 'magnet') drawMagnetItem(f);
+  }
   for (const c of coinsW) drawCoin(c);
   for (const b of boulders) drawBoulder(b);
+  if (ride) drawRideArc(ride, 0);
+  else if (lastRide) drawRideArc(lastRide, lastRide.fade / 500);
   drawClimber();
   drawLava();
   for (const w of warns) drawWarn(w);
