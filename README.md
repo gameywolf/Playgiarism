@@ -24,6 +24,8 @@ the network.
 | Minesweeper | Minesweeper |
 | Block Party | Block Blast |
 | Balls | Ballz |
+| Nertz | Nertz / Pounce (public-domain card game) |
+| Jet Rush | Jetpack Joyride |
 
 ## Building from source
 
