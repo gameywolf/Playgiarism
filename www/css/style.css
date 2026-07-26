@@ -670,6 +670,33 @@ body.home { background: linear-gradient(170deg, #ffeef5, #e8f4ff 55%, #fdf6e3); 
   background: linear-gradient(#ffd166, #ff5a2e);
 }
 
+/* ---------- Lawn Defense ---------- */
+.tile-lawn { background: linear-gradient(140deg, #7cc65a, #2f7d32); }
+/* a lane in miniature: shambler up top, pea in flight, sprout holding the bottom */
+/* the figures need to read against a green tile, so the shambler goes grey rather than
+   the sickly green it is in-game */
+.lawn-icon {
+  position: relative;
+  width: 62px; height: 46px;
+  background: #00000026;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lawn-icon span { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; }
+.lawn-icon .lw-zed {
+  top: 5px;
+  width: 15px; height: 15px;
+  background: #99a3b5;
+  box-shadow: inset 0 -5px 0 #5f6b7a;
+}
+.lawn-icon .lw-pea { top: 23px; width: 8px; height: 8px; background: #f2ffd9; }
+.lawn-icon .lw-plant {
+  bottom: 4px;
+  width: 19px; height: 19px;
+  background: #7ede5c;
+  box-shadow: inset 0 5px 0 #c2f59a;
+}
+
 /* ---------- Ricochet ---------- */
 .tile-ric { background: linear-gradient(140deg, #2b2a63, #1b2140); }
 .ric-icon {
