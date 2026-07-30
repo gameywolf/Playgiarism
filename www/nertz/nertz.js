@@ -49,7 +49,6 @@ let started = false;
 let flights = [];          // cosmetic flying cards {card,x0,y0,x1,y1,t,dur}
 let lastRound = null;      // {scores, caller}
 let banner = null;         // {text, until}
-let groupSuits = false;    // display option: cluster the centre piles by suit
 let lastPlayAt = 0;        // when any card last hit the centre (drives the stall button)
 const STALL_MS = 12000;    // no centre play for this long -> offer a deck shift
 
@@ -148,7 +147,7 @@ function applyFoundation(card, p, srcPt) {
   if (ft.kind === 'new') {
     foundations.push({ s: card.s, top: 1, cards: [card] });
     idx = foundations.length - 1;
-    layoutFoundations();
+    layoutFoundations();   // give the new pile its cell (the grid itself never moves)
   } else {
     const f = foundations[ft.idx];
     f.top = card.r;
@@ -339,7 +338,7 @@ function newMatch() {
 function save() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      diffKey, totals, roundNo, roundOver, started, groupSuits, names,
+      diffKey, totals, roundNo, roundOver, started, names,
       players: players.map((P) => ({ nertz: P.nertz, stock: P.stock, stream: P.stream, work: P.work })),
       foundations,
     }));
@@ -351,7 +350,6 @@ function load() {
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
   if (!s || !s.players) return false;
   diffKey = s.diffKey in DIFF ? s.diffKey : 'medium';
-  groupSuits = !!s.groupSuits;
   if (Array.isArray(s.names) && s.names.length === 4) names = s.names;
   totals = s.totals || [0, 0, 0, 0];
   roundNo = s.roundNo || 1;
@@ -371,6 +369,9 @@ let dpr = 1;
 let L = null;               // layout rects
 let foundRects = [];        // one {x,y,w,h} per foundation
 
+const FAN_CARDS = 6;      // plan the layout around a six-card work pile...
+const FAN_MIN = 0.2;      // ...with at least this fraction of each one showing
+
 function layout() {
   dpr = window.devicePixelRatio || 1;
   const r = wrap.getBoundingClientRect();
@@ -385,16 +386,17 @@ function layout() {
   cw = Math.min(cw, 96);
   let ch = cw * 1.4;
 
-  const cpuH = Math.min(H * 0.16, ch * 0.7);
-  const foundH = Math.min(H * 0.24, ch * 1.05);
+  const cpuH = Math.min(H * 0.13, 70);
+  const foundH = Math.min(centreBandH(W), H * 0.28);
   const mineTop = cpuH + foundH + 10;
-  let mineH = H - mineTop - 6;
-  // shrink cards if the mine area can't hold a header row + a little fan
-  const needMine = ch + 30 + ch * 0.9;
-  if (mineH < needMine) {
-    const k = mineH / needMine;
-    cw *= k; ch = cw * 1.4;
-  }
+
+  // Height, not width, is what makes a work pile unreadable: the fan step is
+  // whatever is left after the header row and the first card, so full-width cards
+  // fanned to nothing. Size the cards from the vertical budget instead — enough
+  // for the header, the first work card, and a visible sliver of five more.
+  const avail = H - mineTop - 14 - 8;
+  const maxCh = avail / (2 + (FAN_CARDS - 1) * FAN_MIN);
+  if (ch > maxCh) { ch = Math.max(52, maxCh); cw = ch / 1.4; }
 
   const cpu = [];
   const cwCpu = (W - 4 * G) / 3;
@@ -419,34 +421,39 @@ function layout() {
   layoutFoundations();
 }
 
+// The centre is a fixed 4x4 grid of chips: a column per suit, four rows because
+// four decks means at most four piles of any one suit. Drawing whole cards there
+// cost the height twice over — the band grew as piles appeared and squeezed the
+// work-pile fan flat. A chip only has to hold a rank and a suit, so it can be
+// short and wide, and the grid never moves once you've learned where a suit is.
+const CGAP = 6;
+const CHIP_MAX_W = 104;
+const CHIP_AR = 0.46;       // height / width
+
+function centreBandH(W) {
+  const w = Math.min((W - 5 * CGAP) / 4, CHIP_MAX_W);
+  return 4 * (w * CHIP_AR) + 3 * CGAP + 10;
+}
+
 function layoutFoundations() {
   foundRects = [];
   if (!L) return;
-  const fcw = Math.min(L.cw * 0.88, (L.foundH - 12) / 1.4);
-  const fch = fcw * 1.4;
-  const n = Math.max(foundations.length + 1, 5); // include one empty "aces here" slot
-  const perRow = Math.max(1, Math.floor((L.W - 12) / (fcw + 6)));
-  const rows = Math.ceil(n / perRow);
-  const gy = rows > 1 ? Math.min(6, (L.foundH - rows * fch) / (rows - 1)) : 6;
-  // display order: creation order, or clustered by suit when the option is on
-  const order = foundations.map((_, i) => i);
-  if (groupSuits) order.sort((a, b) => foundations[a].s - foundations[b].s || a - b);
-  foundRects = new Array(foundations.length);
-  for (let k = 0; k < order.length; k++) {
-    const row = Math.floor(k / perRow), col = k % perRow;
-    const inRow = Math.min(perRow, n - row * perRow);
-    const rowW = inRow * fcw + (inRow - 1) * 6;
-    const x = (L.W - rowW) / 2 + col * (fcw + 6);
-    const y = L.found.y + row * (fch + gy);
-    foundRects[order[k]] = { x: x + fcw / 2, y: y + fch / 2, w: fcw, h: fch, x0: x, y0: y };
-  }
-  L.fcw = fcw; L.fch = fch;
-  // remember the "next slot" spot for the empty ace hint
-  const i = foundations.length;
-  const row = Math.floor(i / perRow), col = i % perRow;
-  const inRow = Math.min(perRow, n - row * perRow);
-  const rowW = inRow * fcw + (inRow - 1) * 6;
-  L.aceSlot = { x: (L.W - rowW) / 2 + col * (fcw + 6), y: L.found.y + row * (fch + gy), w: fcw, h: fch };
+  const availH = L.foundH - 10;
+  let chW = Math.min((L.W - 5 * CGAP) / 4, CHIP_MAX_W);
+  const chH = Math.min(chW * CHIP_AR, (availH - 3 * CGAP) / 4);
+  chW = Math.min(chW, chH / CHIP_AR);
+  const gridW = 4 * chW + 3 * CGAP, gridH = 4 * chH + 3 * CGAP;
+  const gx = (L.W - gridW) / 2;
+  const gy = L.found.y + Math.max(0, (availH - gridH) / 2);
+  L.grid = { x: gx, y: gy, chW, chH };
+  L.fcw = chW; L.fch = chH;
+  // a pile takes the next free row of its suit's column and keeps it for the round
+  const used = [0, 0, 0, 0];
+  foundRects = foundations.map((f) => {
+    const row = Math.min(3, used[f.s]++);
+    const x = gx + f.s * (chW + CGAP), y = gy + row * (chH + CGAP);
+    return { x: x + chW / 2, y: y + chH / 2, w: chW, h: chH, x0: x, y0: y, row };
+  });
 }
 
 function pileTopPoint(p, kind, wi) {
@@ -591,19 +598,59 @@ function drawCard(x, y, w, h, card, opt) {
   if (opt.hint) { roundRect(ctx, x + 1, y + 1, w - 2, h - 2, r); ctx.strokeStyle = '#f5b301'; ctx.lineWidth = 2.5; ctx.stroke(); }
   if (!card) return;
   ctx.fillStyle = isRed(card) ? '#d8324a' : '#26304d';
+  // opt.strip = how much of this card the one above it leaves visible; the index
+  // has to fit inside that sliver or a fanned pile reads as a single card
+  const strip = Math.min(opt.strip || h, h);
+  const fs = Math.max(8, Math.min(Math.round(h * 0.2), Math.round(strip * 0.66)));
+  const ty = y + Math.max(2, Math.min(h * 0.06, (strip - fs) / 2));
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.font = `700 ${Math.round(h * 0.2)}px system-ui, sans-serif`;
-  ctx.fillText(RANKS[card.r], x + w * 0.09, y + h * 0.06);
-  // small corner pips so suit shows on overlapped cards:
-  // top-right for vertical stacks, under the rank for horizontal fans
-  ctx.font = `${Math.round(h * 0.17)}px system-ui, sans-serif`;
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;
+  ctx.fillText(RANKS[card.r], x + w * 0.09, ty);
+  ctx.font = `${fs}px system-ui, sans-serif`;
   ctx.textAlign = 'right';
-  ctx.fillText(SUITS[card.s], x + w * 0.93, y + h * 0.07);
+  ctx.fillText(SUITS[card.s], x + w * 0.93, ty);
+  if (strip > h * 0.5) {
+    // enough of the face shows for the pip under the rank (which is what a
+    // horizontally fanned stream card leaves visible) and the big centre pip
+    ctx.textAlign = 'left';
+    ctx.font = `${Math.round(h * 0.17)}px system-ui, sans-serif`;
+    ctx.fillText(SUITS[card.s], x + w * 0.09, y + h * 0.28);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(h * 0.4)}px system-ui, sans-serif`;
+    ctx.fillText(SUITS[card.s], x + w * 0.5, y + h * 0.62);
+  }
+}
+
+// a centre pile: no card face, just the rank and suit of whatever is on top
+function drawChip(x, y, w, h, s, rank, opt) {
+  opt = opt || {};
+  const r = Math.max(3, h * 0.24);
+  roundRect(ctx, x, y, w, h, r);
+  if (rank == null) {                       // free slot — a faint suit watermark
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
+    ctx.strokeStyle = opt.hint ? '#f5b301' : 'rgba(0,0,0,0.14)';
+    ctx.lineWidth = opt.hint ? 2.5 : 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(38,48,77,0.22)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(h * 0.62)}px system-ui, sans-serif`;
+    ctx.fillText(SUITS[s], x + w / 2, y + h * 0.55);
+    return;
+  }
+  ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+  if (opt.hint) {
+    roundRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
+    ctx.strokeStyle = '#f5b301'; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  const fs = Math.round(h * 0.6);
+  ctx.fillStyle = (s === 1 || s === 2) ? '#d8324a' : '#26304d';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right';
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;
+  ctx.fillText(RANKS[rank], x + w * 0.52, y + h * 0.55);
   ctx.textAlign = 'left';
-  ctx.fillText(SUITS[card.s], x + w * 0.09, y + h * 0.28);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `${Math.round(h * 0.4)}px system-ui, sans-serif`;
-  ctx.fillText(SUITS[card.s], x + w * 0.5, y + h * 0.62);
+  ctx.font = `${fs}px system-ui, sans-serif`;
+  ctx.fillText(SUITS[s], x + w * 0.57, y + h * 0.55);
 }
 
 function emptySlot(x, y, w, h, label) {
@@ -627,11 +674,14 @@ function draw(now) {
   drawFoundations(now);
   drawMine();
 
-  // flights
+  // flights — a card shrinking into the chip it lands on
   for (const f of flights) {
     const k = Math.min(1, f.t / f.dur);
     const e = 1 - Math.pow(1 - k, 2);
-    drawCard((f.x0 + (f.x1 - f.x0) * e) - L.fcw / 2, (f.y0 + (f.y1 - f.y0) * e) - L.fch / 2, L.fcw, L.fch, f.card, {});
+    const w = L.cw + (L.fcw - L.cw) * e, h = L.ch + (L.fch - L.ch) * e;
+    const x = (f.x0 + (f.x1 - f.x0) * e) - w / 2, y = (f.y0 + (f.y1 - f.y0) * e) - h / 2;
+    if (e < 0.6) { ctx.globalAlpha = 1 - e * 0.5; drawCard(x, y, w, h, f.card, {}); ctx.globalAlpha = 1; }
+    else drawChip(x, y, w, h, f.card.s, f.card.r, {});
   }
 
   // drag ghost
@@ -676,13 +726,39 @@ function drawCpus(now) {
 }
 
 const GLOW_MS = 3000;
+
+// ranks you can reach right now: the top of the Nertz pile, the stream and each
+// work pile — used to mark the centre piles those cards would land on
+function reachableRanks() {
+  const P = players[0], set = new Set();
+  const add = (c) => { if (c) set.add(c.s * 16 + c.r); };
+  add(P.nertz[P.nertz.length - 1]);
+  add(P.stream[P.stream.length - 1]);
+  for (let w = 0; w < 4; w++) add(P.work[w][P.work[w].length - 1]);
+  return set;
+}
+
 function drawFoundations(now) {
-  // hint slot for aces
-  if (L.aceSlot) emptySlot(L.aceSlot.x, L.aceSlot.y, L.aceSlot.w, L.aceSlot.h, 'A');
+  const g = L.grid;
+  if (!g) return;
+  const reach = reachableRanks();
+  // free slots first: the lowest one in a suit's column is where its next ace lands
+  const occ = [[], [], [], []];
+  for (let i = 0; i < foundRects.length; i++) if (foundRects[i]) occ[foundations[i].s][foundRects[i].row] = true;
+  for (let s = 0; s < 4; s++) {
+    let free = -1;
+    for (let r = 0; r < 4; r++) if (!occ[s][r]) { free = r; break; }
+    for (let r = 0; r < 4; r++) {
+      if (occ[s][r]) continue;
+      drawChip(g.x + s * (g.chW + CGAP), g.y + r * (g.chH + CGAP), g.chW, g.chH, s, null,
+               { hint: r === free && reach.has(s * 16 + 1) });
+    }
+  }
   for (let i = 0; i < foundations.length; i++) {
     const f = foundations[i], rct = foundRects[i];
     if (!rct) continue;
-    drawCard(rct.x0, rct.y0, L.fcw, L.fch, { r: f.top, s: f.s, o: 0 }, {});
+    drawChip(rct.x0, rct.y0, g.chW, g.chH, f.s, f.top,
+             { hint: f.top < 13 && reach.has(f.s * 16 + f.top + 1) });
     // decaying glow in the colour of whoever just played here
     const el = now - (f.hitAt || -1e9);
     if (el >= 0 && el < GLOW_MS && f.hitBy != null) {
@@ -691,7 +767,7 @@ function drawFoundations(now) {
       ctx.globalAlpha = (1 - k) * (1 - k);    // ease-out fade
       ctx.strokeStyle = META[f.hitBy].color;
       ctx.lineWidth = 3.5;
-      roundRect(ctx, rct.x0 - grow, rct.y0 - grow, L.fcw + 2 * grow, L.fch + 2 * grow, Math.max(5, L.fcw * 0.14));
+      roundRect(ctx, rct.x0 - grow, rct.y0 - grow, L.fcw + 2 * grow, L.fch + 2 * grow, Math.max(5, L.fch * 0.3));
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -747,7 +823,8 @@ function drawMine() {
     for (let k = 0; k < pile.length; k++) {
       if (drag && drag.kind === 'work' && drag.wi === w && k >= drag.ci) break; // lifted cards
       const top = k === pile.length - 1;
-      drawCard(x, L.yWork + k * step, L.cw, L.ch, pile[k], { hint: top && canFoundation(pile[k]) });
+      drawCard(x, L.yWork + k * step, L.cw, L.ch, pile[k],
+               { hint: top && canFoundation(pile[k]), strip: top ? L.ch : step });
     }
   }
 }
@@ -801,15 +878,6 @@ shiftBtn.onclick = () => {
 };
 document.addEventListener('pointerdown', unlockAudio, { capture: true });
 
-function syncGroupBtn() {
-  document.getElementById('groupSuitsBtn').textContent = 'Group center piles by suit: ' + (groupSuits ? 'On' : 'Off');
-}
-document.getElementById('groupSuitsBtn').onclick = () => {
-  groupSuits = !groupSuits;
-  syncGroupBtn();
-  layoutFoundations();
-  save();
-};
 document.getElementById('menuBtn').onclick = () => { if (started) document.getElementById('menuOverlay').classList.add('active'); };
 document.getElementById('resumeBtn').onclick = () => document.getElementById('menuOverlay').classList.remove('active');
 document.getElementById('restartBtn').onclick = () => { document.getElementById('menuOverlay').classList.remove('active'); newMatch(); };
@@ -828,5 +896,4 @@ if (load()) {
   layout();
   document.getElementById('diffOverlay').classList.add('active');
 }
-syncGroupBtn();
 requestAnimationFrame(loop);
