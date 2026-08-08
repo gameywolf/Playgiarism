@@ -104,9 +104,25 @@ scraping the originals' servers or APIs.
   - `www/lawn/` — Lawn Defense (Plants vs. Zombies clone: five lanes, seed packets with
     sun costs and per-packet cooldowns, shamblers that stop to chew whatever is in front
     of them, one single-use mower per lane as the last line, second breach in a lane ends
-    the run. **The lanes run top-to-bottom, not side-on** — the genre's usual landscape
-    lane is unplayable on a phone, so shamblers walk down, plants shoot up, mowers sit
-    along the bottom. Six plants unlock by level (Sunbloom/Pea Pod → Barknut → Boom Berry
+    the run. Lanes run side-on: shamblers walk in from the right, plants shoot right, and
+    the mowers wait along the left in front of the house. Internally a shambler still
+    advances along one "depth" coordinate counting up from 0 at the spawn edge to DEPTH at
+    the house, so the movement, chewing and mower logic stays one-dimensional and
+    direction-agnostic — only `dx()`/`ly()` know the lawn is drawn right-to-left, which is
+    what made the rotation a projection change rather than a rewrite.
+    **This is the one game that runs landscape.** `AndroidManifest.xml` pins the activity
+    to `portrait` for everything else, so the page calls `@capacitor/screen-orientation` at
+    load to request landscape and explicitly re-locks portrait on the way out (back button
+    first, `pagehide` as backup) — the whole app shares one WebView, so leaving without
+    restoring strands the menu sideways. `unlock()` is deliberately not used: it maps to
+    SCREEN_ORIENTATION_UNSPECIFIED, which frees rotation rather than returning to the
+    manifest value. In a browser the lock needs fullscreen and usually fails, so `draw()`
+    shows a "turn sideways" nudge whenever the canvas ends up portrait.
+    Landscape alone barely helped (42px → 44px cells) because height then became the
+    binding axis, so the seed tray moves to whichever edge is affordable: a column on the
+    left in landscape, the usual bar on top in portrait, and `body.lawn` gets a media query
+    compacting the shared topbar/HUD on short screens (117px → 77px). Together those take a
+    720×400 phone to ~63px cells. Six plants unlock by level (Sunbloom/Pea Pod → Barknut → Boom Berry
     → Frost Pod → Twin Pod), four shambler types unlock the same way.
     `ZOMBIES[].speed` is the balance-critical number: it's in rows per second, and a
     standard shambler crossing the eight rows in ~36s is just longer than one Pea Pod

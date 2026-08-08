@@ -1,7 +1,12 @@
-/* Lawn Defense — a lane defender. Sprouts hold the garden; shamblers march down it.
-   The genre normally runs its lanes side-on, which wants a landscape screen. Everything
-   here is portrait-first, so the lanes run top-to-bottom instead: shamblers walk down,
-   plants shoot up, and the mowers wait along the bottom edge.
+/* Lawn Defense — a lane defender. Sprouts hold the garden; shamblers march across it.
+   Lanes run side-on: shamblers walk in from the right, plants shoot right, and the
+   mowers wait along the left edge in front of the house.
+
+   Internally a shambler still *advances* along a single "depth" coordinate that counts
+   up from 0 at the spawn edge to DEPTH at the house, so all the movement, chewing and
+   mower logic is one-dimensional and direction-agnostic. Only the projection to pixels
+   knows which way round the lawn is: depth is drawn right-to-left (see dx/cellCX), so
+   depth 0 is the right-hand column and depth DEPTH-1 is the column the mowers defend.
 
    Levels come from a seeded wave generator (see buildWaves) rather than a hand-authored
    list, so level N is the same fight every time without shipping level data. */
@@ -10,7 +15,7 @@
 const STATE_KEY = 'lawn.state.v1';
 const SCORE_KEY = 'lawn.scores.v1';
 
-const COLS = 5, ROWS = 8;
+const LANES = 5, DEPTH = 8;
 
 const START_SUN = 125;       // level 1; see startSun() for the per-level ramp
 const SUN_VALUE = 25;
@@ -100,7 +105,7 @@ let score = 0;
 let checkpoint = 0;         // score banked when the current level started — a retry rolls
                             // back to it, so a failed level can't be farmed for points
 let sun = START_SUN;        // replaced by startSun() at every startLevel()
-let grid = [];              // ROWS*COLS, plant object or null
+let grid = [];              // DEPTH*LANES, plant object or null
 let zombies = [];
 let peas = [];
 let suns = [];
@@ -121,6 +126,31 @@ let runRecords = new Set();
 let now = 0;
 let zid = 0;
 
+/* ---------------- Orientation ----------------
+   Side-on lanes want a wide screen, but the app's activity is pinned to portrait in
+   AndroidManifest.xml for every other game. setRequestedOrientation at runtime overrides
+   the manifest for the live activity, so this page asks for landscape on the way in and
+   puts portrait back on the way out — the whole app shares one WebView, so leaving
+   without restoring would strand the menu and every other game sideways.
+
+   unlock() is deliberately not used on exit: it maps to SCREEN_ORIENTATION_UNSPECIFIED,
+   which lets the device rotate freely rather than returning to the manifest's portrait. */
+const screenOrientation = () =>
+  window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
+
+async function lockLandscape() {
+  const so = screenOrientation();
+  if (so) { try { await so.lock({ orientation: 'landscape' }); return; } catch { /* fall through */ } }
+  // Browsers only allow this in fullscreen, so it usually rejects — the rotate nudge in
+  // draw() covers the case where we end up portrait anyway.
+  try { await screen.orientation.lock('landscape'); } catch { /* not supported */ }
+}
+async function restorePortrait() {
+  const so = screenOrientation();
+  if (so) { try { await so.lock({ orientation: 'portrait' }); } catch { /* ignore */ } }
+  try { screen.orientation.unlock(); } catch { /* ignore */ }
+}
+
 // ---------------- Layout ----------------
 const area = document.querySelector('.game-area');
 const canvas = document.getElementById('board');
@@ -137,9 +167,9 @@ function safeBottom() {
   return safeProbe.getBoundingClientRect().height;
 }
 
-/* Everything in play is stored in grid units — a zombie's position is a float row, a
-   pea's is a float row in a fixed lane — so a resize or rotate just re-derives pixels
-   and nothing teleports. */
+/* Everything in play is stored in grid units — a shambler's position is a float depth in
+   a fixed lane, a pea's likewise — so a resize or rotate just re-derives pixels and
+   nothing teleports. */
 function layout() {
   dpr = window.devicePixelRatio || 1;
   const r = area.getBoundingClientRect();
@@ -148,36 +178,57 @@ function layout() {
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
   const w = r.width, h = r.height;
-  const trayH = Math.min(Math.max(h * 0.13, 54), 88);
   const bottom = Math.max(safeBottom(), 4);
-  // A cell above the lawn is the strip the shamblers walk in from — they spawn inside it
-  // rather than off-screen, so they aren't clipped by the tray. 0.62 below is the mower row.
-  const cell = Math.min(w * 0.985 / COLS, (h - trayH - bottom) / (ROWS + 1.62));
-  const gw = cell * COLS, gh = cell * ROWS;
-  const oy = trayH + cell + Math.max(0, (h - bottom - trayH - cell * 1.62 - gh)) * 0.5;
-  G = { w, h, trayH, cell, gw, gh, ox: (w - gw) / 2, oy, slots: traySlots(w, trayH) };
+  /* The seed tray sits along whichever edge we can afford to spend. In landscape height
+     is the scarce axis (five lanes have to fit under the topbar and HUD) while width is
+     plentiful, so the tray becomes a column on the left and gives its 54px back to the
+     lawn; in portrait it stays the usual bar across the top. Without this, forcing
+     landscape barely moved the cell size — the lawn just became height-bound instead. */
+  const sideways = w > h;
+  const trayW = sideways ? Math.min(Math.max(w * 0.1, 62), 96) : 0;
+  const trayH = sideways ? 0 : Math.min(Math.max(h * 0.13, 54), 88);
+  const availW = w - trayW;
+  const availH = h - trayH - bottom;
+  // DEPTH columns of lawn, plus a column on the right the shamblers walk in along (they
+  // spawn inside it rather than off-screen) and 0.62 on the left for the mowers and house.
+  const cell = Math.min(availW / (DEPTH + 1.62), availH * 0.98 / LANES);
+  const gw = cell * DEPTH, gh = cell * LANES;
+  const ox = trayW + cell * 0.62 + Math.max(0, availW - cell * (DEPTH + 1.62)) * 0.5;
+  const oy = trayH + Math.max(0, availH - gh) * 0.5;
+  G = { w, h, trayH, trayW, cell, gw, gh, ox, oy, slots: traySlots(w, h, trayW, trayH) };
 }
 
 // Tray slot rects, recomputed on layout and whenever the unlock set changes.
-function traySlots(w, trayH) {
-  const ids = unlockedPlants();
-  const n = ids.length + 1;                       // +1 for the shovel
+// trayW > 0 means the column-on-the-left form; otherwise the bar across the top.
+function traySlots(w, h, trayW, trayH) {
+  const ids = unlockedPlants().concat('shovel');
+  const n = ids.length;
+  if (trayW > 0) {
+    const gap = Math.min(8, h * 0.014);
+    const sh = Math.min((h - 12 - gap * (n - 1)) / n, trayW * 1.05);
+    const sw = Math.min(trayW - 10, sh * 0.92);
+    const total = sh * n + gap * (n - 1);
+    const y0 = Math.max(6, (h - total) / 2);
+    return ids.map((id, i) => ({ id, x: (trayW - sw) / 2, y: y0 + i * (sh + gap), w: sw, h: sh }));
+  }
   const gap = Math.min(8, w * 0.016);
   const sw = Math.min((w - 12 - gap * (n - 1)) / n, (trayH - 12) * 0.86);
   const total = sw * n + gap * (n - 1);
   const x0 = (w - total) / 2;
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    out.push({ id: i < ids.length ? ids[i] : 'shovel', x: x0 + i * (sw + gap), y: 6, w: sw, h: trayH - 12 });
-  }
-  return out;
+  return ids.map((id, i) => ({ id, x: x0 + i * (sw + gap), y: 6, w: sw, h: trayH - 12 }));
 }
 function unlockedPlants() {
   return TRAY_ORDER.filter(id => level >= PLANTS[id].unlock);
 }
 
-const cellX = c => G.ox + (c + 0.5) * G.cell;
-const cellY = r => G.oy + (r + 0.5) * G.cell;
+/* Grid -> pixels. Depth is drawn right-to-left, so a shambler advancing (depth going up)
+   walks leftward toward the house, and a mower running back down the depth axis drives
+   rightward. Everything else in the file works in depth/lane units and never needs to
+   know that. */
+const dx = d => G.ox + (DEPTH - d) * G.cell;      // continuous depth coord -> x
+const ly = l => G.oy + l * G.cell;                // continuous lane coord -> y
+const cellX = d => dx(d + 0.5);                   // cell centre x for depth index d
+const cellY = l => ly(l + 0.5);                   // cell centre y for lane index l
 
 // ---------------- Level / wave generation ----------------
 /* A wave is a list of {t, type, lane} spawns. Budget grows with both the wave number and
@@ -206,12 +257,12 @@ function buildWaves(lv) {
     // Spread the spawns over a window, tighter on the final wave so it actually crowds.
     const window = 4000 + picks.length * (last ? 850 : 1600);
     const times = picks.map(() => rnd() * window).sort((a, b) => a - b);
-    const laneUse = new Array(COLS).fill(0);
+    const laneUse = new Array(LANES).fill(0);
     const spawns = picks.map((type, j) => {
       // Prefer the least-used lanes so a wave never piles into one column.
       const min = Math.min(...laneUse);
       const open = [];
-      for (let c = 0; c < COLS; c++) if (laneUse[c] === min) open.push(c);
+      for (let c = 0; c < LANES; c++) if (laneUse[c] === min) open.push(c);
       const lane = open[Math.floor(rnd() * open.length)];
       laneUse[lane]++;
       return { t: Math.max(0, times[j] + j * 120), type, lane };
@@ -232,9 +283,9 @@ function prepMs() { return level === 1 ? 20000 : 14000 + Math.min(6000, (level -
 function startLevel(keepScore) {
   if (!keepScore) checkpoint = 0;
   score = checkpoint;
-  grid = new Array(ROWS * COLS).fill(null);
+  grid = new Array(DEPTH * LANES).fill(null);
   zombies = []; peas = []; suns = []; blasts = []; popups = [];
-  mowers = new Array(COLS).fill(null).map(() => ({ row: ROWS + 0.35, running: false }));
+  mowers = new Array(LANES).fill(null).map(() => ({ row: DEPTH + 0.35, running: false }));
   waves = buildWaves(level);
   waveIdx = -1;
   waveT = 0;
@@ -246,7 +297,7 @@ function startLevel(keepScore) {
   skyT = SKY_EVERY * 0.6;
   phase = 'play';
   banner = { txt: 'Level ' + level, sub: 'Plant while you can', t: 0 };
-  if (G) G.slots = traySlots(G.w, G.trayH);
+  if (G) G.slots = traySlots(G.w, G.h, G.trayW, G.trayH);
   hideOverlays();
   updateHud();
   saveState();
@@ -273,39 +324,53 @@ function loadState() {
 }
 
 // ---------------- Actions ----------------
-function popup(gx, gy, txt, col, big) {
-  popups.push({ gx, gy, txt, col: col || '#fff', big: !!big, t: 0 });
+// Pixel coords: popups are short-lived and come from several different frames of
+// reference (a grid cell, a shambler mid-lane, a sun anywhere on screen), so they're
+// projected once at creation rather than carrying a coordinate system around.
+function popup(px, py, txt, col, big) {
+  popups.push({ px, py, txt, col: col || '#fff', big: !!big, t: 0 });
 }
 
-function addSunAt(gx, gy, value) {
-  suns.push({ gx, gy, ty: gy, value, t: 0, landed: true, vy: 0 });
+/* A Sunbloom's payout lobs a full cell clear of the plant before settling. Dropping it
+   on top of the flower buried it: same yellow, same size, sitting over the petals, and
+   easy to miss entirely. It hops toward the next lane, or back the other way when the
+   bloom is in the last one, so it always ends up on open grass. */
+function addBloomSun(depth, lane) {
+  // tossed out to the right (the emptier side — players build up from the left) and then
+  // settling a lane over, so it ends up roughly a cell clear of the bloom in both axes
+  const gx0 = DEPTH - depth - 0.5;
+  const gx = Math.min(DEPTH - 0.35, Math.max(0.35, gx0 + 0.58 + (Math.random() - 0.5) * 0.2));
+  const gy = lane + 0.5;
+  const dir = lane >= LANES - 1.5 ? -1 : 1;
+  const ty = Math.min(LANES - 0.3, Math.max(0.3, gy + dir * 0.66));
+  suns.push({ gx, gy, ty, value: SUN_VALUE, t: 0, landed: false, vy: 1.7 });
 }
 function spawnSkySun() {
-  const gx = 0.55 + Math.random() * (COLS - 1.1);
-  suns.push({ gx, gy: -1.2, ty: 1 + Math.random() * (ROWS - 2.2), value: SUN_VALUE, t: 0, landed: false, vy: 1.4 });
+  const gx = 0.55 + Math.random() * (DEPTH - 1.1);
+  suns.push({ gx, gy: -1.2, ty: 0.5 + Math.random() * (LANES - 1.0), value: SUN_VALUE, t: 0, landed: false, vy: 1.4 });
 }
 
 function canAfford(id) { return sun >= PLANTS[id].cost && !(cooldowns[id] > 0); }
 
 function tryPlant(c, r) {
   if (!selected || selected === 'shovel') return false;
-  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
-  if (grid[r * COLS + c]) return false;
+  if (c < 0 || c >= LANES || r < 0 || r >= DEPTH) return false;
+  if (grid[r * LANES + c]) return false;
   const def = PLANTS[selected];
   if (!canAfford(selected)) return false;
   sun -= def.cost;
   cooldowns[selected] = def.cd;
   const p = { type: selected, c, r, hp: def.hp, maxHp: def.hp, t: 0, shootT: 400, prodT: BLOOM_FIRST, fuse: def.fuse || 0, burst: 0, burstT: 0, recoil: 0 };
-  grid[r * COLS + c] = p;
+  grid[r * LANES + c] = p;
   selected = null;
   updateHud();
   return true;
 }
 function shovel(c, r) {
-  const p = grid[r * COLS + c];
+  const p = grid[r * LANES + c];
   if (!p) return false;
-  grid[r * COLS + c] = null;
-  popup(c + 0.5, r + 0.4, '✕', '#ffd9d9');
+  grid[r * LANES + c] = null;
+  popup(cellX(r), cellY(c), '✕', '#ffd9d9');
   selected = null;
   return true;
 }
@@ -323,8 +388,8 @@ function explode(c, r, dmg) {
   }
   for (let rr = r - 1; rr <= r + 1; rr++) {
     for (let cc = c - 1; cc <= c + 1; cc++) {
-      if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
-      const q = grid[rr * COLS + cc];
+      if (rr < 0 || rr >= DEPTH || cc < 0 || cc >= LANES) continue;
+      const q = grid[rr * LANES + cc];
       if (q && q.type === 'boom' && !(cc === c && rr === r)) q.fuse = Math.min(q.fuse, 120);
     }
   }
@@ -343,7 +408,7 @@ function hurt(z, dmg, chill) {
   if (z.hp <= 0) {
     z.dead = true;
     score += ZOMBIES[z.type].points;
-    popup(z.lane + 0.5, z.row + 0.3, '+' + ZOMBIES[z.type].points, '#e9ffd9');
+    popup(dx(z.row + 0.5), cellY(z.lane) - G.cell * 0.22, '+' + ZOMBIES[z.type].points, '#e9ffd9');
     updateHud();
   }
 }
@@ -390,8 +455,10 @@ function updateSun(dt) {
   if (skyT <= 0) { spawnSkySun(); skyT = SKY_EVERY; }
   for (const s of suns) {
     if (!s.landed) {
-      s.gy += s.vy * dt / 1000;
-      if (s.gy >= s.ty) { s.gy = s.ty; s.landed = true; }
+      // moves toward ty from either side — sky suns fall in, bloom suns can hop up
+      const step = s.vy * dt / 1000;
+      s.gy += s.gy < s.ty ? Math.min(step, s.ty - s.gy) : -Math.min(step, s.gy - s.ty);
+      if (Math.abs(s.gy - s.ty) < 1e-3) { s.gy = s.ty; s.landed = true; }
     } else s.t += dt;
   }
   suns = suns.filter(s => s.t < SUN_LIFE);
@@ -440,7 +507,7 @@ function updatePlants(dt) {
       if (p.prodT <= 0) {
         p.prodT = BLOOM_EVERY;
         p.pop = 1;
-        addSunAt(p.c + 0.5 + (Math.random() - 0.5) * 0.35, p.r + 0.35, SUN_VALUE);
+        addBloomSun(p.r, p.c);
       }
       if (p.pop > 0) p.pop = Math.max(0, p.pop - dt / 400);
     } else if (p.type === 'boom') {
@@ -496,7 +563,7 @@ function updateZombies(dt) {
     if (z.flash > 0) z.flash -= dt;
     // The cell under a shambler's hands is the one it chews on.
     const cr = Math.floor(z.row + 0.62);
-    const target = cr >= 0 && cr < ROWS ? grid[cr * COLS + z.lane] : null;
+    const target = cr >= 0 && cr < DEPTH ? grid[cr * LANES + z.lane] : null;
     z.eating = !!target;
     if (target) {
       target.hp -= d.dps * dt / 1000;
@@ -510,7 +577,7 @@ function updateZombies(dt) {
 }
 
 function updateMowers(dt) {
-  for (let c = 0; c < COLS; c++) {
+  for (let c = 0; c < LANES; c++) {
     const m = mowers[c];
     if (!m) continue;
     if (m.running) {
@@ -533,15 +600,15 @@ function updateMowers(dt) {
   }
   if (phase !== 'play') return;
   for (const z of zombies) {
-    if (z.dead || z.row < ROWS + 0.15) continue;
+    if (z.dead || z.row < DEPTH + 0.15) continue;
     const m = mowers[z.lane];
     if (m && !m.running) {
       m.running = true;
-      popup(z.lane + 0.5, ROWS - 0.2, 'MOWED!', '#ffe9a8', true);
+      popup(dx(DEPTH - 0.4), cellY(z.lane), 'MOWED!', '#ffe9a8', true);
     } else if (!m) {
       loseLevel();
       return;
-    } else if (z.row > ROWS + 1.5) {
+    } else if (z.row > DEPTH + 1.5) {
       // A mower mid-sweep starts below every shambler in its lane and clears the whole
       // lane in under a second, so it catches anything that crosses while it runs — two
       // arriving on the same tick is survivable. This is the backstop for the state that
@@ -623,7 +690,7 @@ function drawPlant(type, x, y, s, p) {
   ctx.save();
   ctx.translate(x + bite, y + bob);
   const rec = p ? p.recoil : 0;
-  if (rec) ctx.translate(0, rec * s * 0.07);
+  if (rec) ctx.translate(-rec * s * 0.07, 0);   // kick back left, against the shot
 
   // shadow
   ctx.fillStyle = '#00000018';
@@ -661,22 +728,22 @@ function drawPlant(type, x, y, s, p) {
     const body = cool ? '#bfe9ff' : '#5cc25a';
     const dark = cool ? '#8ec9e8' : '#3d9b3d';
     stem(s, cool ? '#7fbf9c' : '#3d9b3d');
-    // barrel(s), pointing up the lane
+    // barrel(s), pointing right down the lane
     ctx.fillStyle = dark;
-    const bx = type === 'twin' ? [-s * 0.115, s * 0.115] : [0];
-    for (const o of bx) { rr(o - s * 0.055, -s * 0.46, s * 0.11, s * 0.24, s * 0.04); ctx.fill(); }
+    const by = type === 'twin' ? [-s * 0.105, s * 0.075] : [-s * 0.015];
+    for (const o of by) { rr(s * 0.14, o - s * 0.055, s * 0.26, s * 0.11, s * 0.04); ctx.fill(); }
     ctx.fillStyle = body;
     if (type === 'twin') {
-      // two heads side by side, so it reads differently from the single Pea Pod
-      circle(-s * 0.1, -s * 0.13, s * 0.145);
-      circle(s * 0.1, -s * 0.13, s * 0.145);
+      // two heads stacked, so it reads differently from the single Pea Pod
+      circle(0, -s * 0.22, s * 0.145);
+      circle(0, -s * 0.04, s * 0.145);
     }
     circle(0, -s * 0.13, s * 0.175);
     ctx.fillStyle = dark;
     ctx.globalAlpha = 0.35;
     circle(s * 0.06, -s * 0.08, s * 0.11);
     ctx.globalAlpha = 1;
-    eyes(0, -s * 0.16, s * 0.95, -0.4);
+    eyes(s * 0.03, -s * 0.16, s * 0.95, 0.5);
     if (cool) {
       ctx.strokeStyle = '#ffffffcc';
       ctx.lineWidth = s * 0.018;
@@ -772,10 +839,10 @@ function drawZombie(z, x, y, s) {
   rr(-w * 0.34, h * 0.12, w * 0.26, h * 0.34 + step * h * 0.05, w * 0.1); ctx.fill();
   rr(w * 0.08, h * 0.12, w * 0.26, h * 0.34 - step * h * 0.05, w * 0.1); ctx.fill();
 
-  // arms reaching down the lane (down is "forward" here)
+  // arms reaching left along the lane, the way it's walking
   ctx.fillStyle = skinDark;
-  rr(-w * 0.52, h * 0.0, w * 0.2, h * 0.42, w * 0.09); ctx.fill();
-  rr(w * 0.32, h * 0.0, w * 0.2, h * 0.42, w * 0.09); ctx.fill();
+  rr(-w * 0.95, -h * 0.06, w * 0.62, h * 0.16, w * 0.08); ctx.fill();
+  rr(-w * 0.88, h * 0.12, w * 0.58, h * 0.15, w * 0.07); ctx.fill();
 
   // torso
   ctx.fillStyle = cloth;
@@ -879,23 +946,20 @@ function draw() {
   drawSpawnStrip();
   drawLawn();
 
-  // suns behind everything living
-  for (const s of suns) drawSun(s);
-
   // plants
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const p = grid[r * COLS + c];
-      if (p) drawPlant(p.type, cellX(c), cellY(r), cell, p);
+  for (let r = 0; r < DEPTH; r++) {
+    for (let c = 0; c < LANES; c++) {
+      const p = grid[r * LANES + c];
+      if (p) drawPlant(p.type, cellX(r), cellY(c), cell, p);
     }
   }
 
   // ghost of the plant being placed
   if (selected && selected !== 'shovel' && hoverCell) {
     const [hc, hr] = hoverCell;
-    if (!grid[hr * COLS + hc]) {
+    if (!grid[hr * LANES + hc]) {
       ctx.globalAlpha = 0.45;
-      drawPlant(selected, cellX(hc), cellY(hr), cell, null);
+      drawPlant(selected, cellX(hr), cellY(hc), cell, null);
       ctx.globalAlpha = 1;
     }
   }
@@ -903,7 +967,7 @@ function draw() {
   // peas
   // peas need a dark rim — a plain green dot vanishes against the lawn
   for (const q of peas) {
-    const x = cellX(q.lane), y = oy + q.row * cell;
+    const x = dx(q.row), y = cellY(q.lane);
     ctx.fillStyle = q.frost ? '#2b5a72' : '#2f6b25';
     circle(x, y, cell * 0.105);
     ctx.fillStyle = q.frost ? '#cdeeff' : '#a7ee6a';
@@ -914,21 +978,26 @@ function draw() {
 
   // shamblers, back to front so nearer ones overlap
   const order = zombies.slice().sort((a, b) => a.row - b.row);
-  for (const z of order) drawZombie(z, cellX(z.lane), oy + (z.row + 0.5) * cell, cell);
+  for (const z of order) drawZombie(z, dx(z.row + 0.5), cellY(z.lane), cell);
 
   drawMowers();
+
+  // Suns go over the plants, not under them. Drawn behind, one that came to rest on a
+  // Sunbloom was half-hidden by the petals it matches in colour — which is most of why
+  // they were easy to miss.
+  for (const s of suns) drawSun(s);
 
   // blasts
   for (const b of blasts) {
     const k = b.t / 520;
     ctx.globalAlpha = 1 - k;
     const rad = cell * (0.5 + k * 1.5);
-    const g = ctx.createRadialGradient(cellX(b.c), cellY(b.r), rad * 0.2, cellX(b.c), cellY(b.r), rad);
+    const g = ctx.createRadialGradient(cellX(b.r), cellY(b.c), rad * 0.2, cellX(b.r), cellY(b.c), rad);
     g.addColorStop(0, '#fff6c9');
     g.addColorStop(0.5, '#ff9d3c');
     g.addColorStop(1, '#ff5a2e00');
     ctx.fillStyle = g;
-    circle(cellX(b.c), cellY(b.r), rad);
+    circle(cellX(b.r), cellY(b.c), rad);
     ctx.globalAlpha = 1;
   }
 
@@ -945,7 +1014,7 @@ function draw() {
     ctx.font = `800 ${(p.big ? cell * 0.34 : cell * 0.2)}px 'Segoe UI', sans-serif`;
     ctx.strokeStyle = '#0007';
     ctx.lineWidth = 4;
-    const px = ox + p.gx * cell, py = oy + p.gy * cell - k * cell * 0.6;
+    const px = p.px, py = p.py - k * cell * 0.6;
     ctx.strokeText(p.txt, px, py);
     ctx.fillText(p.txt, px, py);
   }
@@ -967,6 +1036,19 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  // Landscape is requested on load, but a browser can refuse it (the lock needs
+  // fullscreen). Say so rather than leaving a squashed lawn unexplained.
+  if (h > w) {
+    const bh = cell * 0.5;
+    ctx.fillStyle = '#00000066';
+    ctx.fillRect(0, oy + gh + cell * 0.7, w, bh);
+    ctx.fillStyle = '#ffffffdd';
+    ctx.font = `700 ${Math.min(cell * 0.24, 15)}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('↻ Turn sideways for the full lawn', w / 2, oy + gh + cell * 0.7 + bh / 2);
+  }
+
   // First-run hint, over the lawn rather than over the mowers, and gone the moment the
   // first seed goes in the ground.
   if (level === 1 && waveIdx < 0 && !selected && !grid.some(Boolean)) {
@@ -982,79 +1064,87 @@ function draw() {
   }
 }
 
-// The path the shamblers come in along. It sits over the lawn's width, not the canvas
-// width — on a desktop window the lawn is a centred column with gutters either side.
+// The path the shamblers come in along — a column down the right-hand side, spanning the
+// lanes rather than the canvas height.
 function drawSpawnStrip() {
-  const { cell, ox, gw, oy } = G;
-  const y = oy - cell;
-  const x = ox - cell * 0.06, w = gw + cell * 0.12;
+  const { cell, oy, gh } = G;
+  const x = dx(0);
+  const y = oy - cell * 0.06, h = gh + cell * 0.12;
   ctx.fillStyle = '#8b8474';
-  ctx.fillRect(x, y, w, cell);
+  ctx.fillRect(x, y, cell, h);
   ctx.fillStyle = '#9a9382';
-  ctx.fillRect(x, y, w, cell * 0.12);
+  ctx.fillRect(x + cell * 0.88, y, cell * 0.12, h);
   ctx.strokeStyle = '#7a746688';
   ctx.lineWidth = 1;
-  for (let c = 1; c < COLS; c++) {
+  for (let l = 1; l < LANES; l++) {
     ctx.beginPath();
-    ctx.moveTo(ox + c * cell, y + cell * 0.14);
-    ctx.lineTo(ox + c * cell, y + cell);
+    ctx.moveTo(x, ly(l));
+    ctx.lineTo(x + cell * 0.86, ly(l));
     ctx.stroke();
   }
 }
 
 function drawLawn() {
   const { cell, ox, oy, gw, gh } = G;
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      ctx.fillStyle = (r + c) % 2 ? '#67ad4f' : '#74bb59';
-      ctx.fillRect(ox + c * cell, oy + r * cell, cell + 0.5, cell + 0.5);
+  for (let d = 0; d < DEPTH; d++) {
+    for (let l = 0; l < LANES; l++) {
+      ctx.fillStyle = (d + l) % 2 ? '#67ad4f' : '#74bb59';
+      ctx.fillRect(dx(d + 1), ly(l), cell + 0.5, cell + 0.5);
     }
   }
-  // mow stripes for a bit of texture
+  // mow stripes run along the lanes now, so they read as the direction of travel
   ctx.fillStyle = '#ffffff10';
-  for (let c = 0; c < COLS; c += 2) ctx.fillRect(ox + c * cell, oy, cell, gh);
+  for (let l = 0; l < LANES; l += 2) ctx.fillRect(ox, ly(l), gw, cell);
   ctx.strokeStyle = '#00000018';
   ctx.lineWidth = 1;
-  for (let c = 0; c <= COLS; c++) {
-    ctx.beginPath(); ctx.moveTo(ox + c * cell, oy); ctx.lineTo(ox + c * cell, oy + gh); ctx.stroke();
+  for (let d = 0; d <= DEPTH; d++) {
+    ctx.beginPath(); ctx.moveTo(dx(d), oy); ctx.lineTo(dx(d), oy + gh); ctx.stroke();
   }
-  for (let r = 0; r <= ROWS; r++) {
-    ctx.beginPath(); ctx.moveTo(ox, oy + r * cell); ctx.lineTo(ox + gw, oy + r * cell); ctx.stroke();
+  for (let l = 0; l <= LANES; l++) {
+    ctx.beginPath(); ctx.moveTo(ox, ly(l)); ctx.lineTo(ox + gw, ly(l)); ctx.stroke();
   }
-  // the house edge the mowers defend
+  // the house edge the mowers defend, now the left-hand wall
   ctx.fillStyle = '#c9a27a';
-  ctx.fillRect(ox - cell * 0.06, oy + gh, gw + cell * 0.12, cell * 0.62);
+  ctx.fillRect(ox - cell * 0.62, oy - cell * 0.06, cell * 0.62, gh + cell * 0.12);
   ctx.fillStyle = '#b18a63';
-  ctx.fillRect(ox - cell * 0.06, oy + gh, gw + cell * 0.12, cell * 0.1);
+  ctx.fillRect(ox - cell * 0.1, oy - cell * 0.06, cell * 0.1, gh + cell * 0.12);
 }
 
 function drawMowers() {
-  const { cell, oy } = G;
-  for (let c = 0; c < COLS; c++) {
+  const { cell } = G;
+  for (let c = 0; c < LANES; c++) {
     const m = mowers[c];
     if (!m) continue;
-    const x = cellX(c), y = oy + m.row * cell;
+    const x = dx(m.row), y = cellY(c);
     const s = cell * 0.72;
     ctx.save();
     ctx.translate(x, y);
+    // side-on: wheels underneath, blade housing out front (to the right, the way it runs)
     ctx.fillStyle = '#00000022';
-    ctx.beginPath(); ctx.ellipse(0, s * 0.28, s * 0.34, s * 0.1, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, s * 0.3, s * 0.36, s * 0.09, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#3f4657';
-    circle(-s * 0.24, s * 0.18, s * 0.12);
-    circle(s * 0.24, s * 0.18, s * 0.12);
+    circle(-s * 0.2, s * 0.2, s * 0.13);
+    circle(s * 0.18, s * 0.2, s * 0.11);
     ctx.fillStyle = '#d1443f';
-    rr(-s * 0.34, -s * 0.16, s * 0.68, s * 0.34, s * 0.1); ctx.fill();
+    rr(-s * 0.32, -s * 0.14, s * 0.6, s * 0.34, s * 0.1); ctx.fill();
     ctx.fillStyle = '#ec6a5c';
-    rr(-s * 0.28, -s * 0.12, s * 0.56, s * 0.12, s * 0.06); ctx.fill();
+    rr(-s * 0.26, -s * 0.1, s * 0.34, s * 0.11, s * 0.05); ctx.fill();
+    // handle swept back over the body
+    ctx.strokeStyle = '#8d9099';
+    ctx.lineWidth = s * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.34); ctx.lineTo(-s * 0.02, -s * 0.12);
+    ctx.stroke();
+    // blade housing
     ctx.fillStyle = '#8d9099';
-    rr(-s * 0.3, -s * 0.3, s * 0.6, s * 0.12, s * 0.05); ctx.fill();
+    rr(s * 0.24, -s * 0.04, s * 0.16, s * 0.26, s * 0.05); ctx.fill();
     if (m.running) {
       ctx.strokeStyle = '#ffffffaa';
       ctx.lineWidth = s * 0.06;
       const a = now / 40;
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
-        ctx.arc(0, -s * 0.24, s * 0.2, a + i * 2.1, a + i * 2.1 + 0.9);
+        ctx.arc(s * 0.32, s * 0.09, s * 0.2, a + i * 2.1, a + i * 2.1 + 0.9);
         ctx.stroke();
       }
     }
@@ -1082,16 +1172,24 @@ function drawSun(s) {
   g.addColorStop(1, '#f7b733');
   ctx.fillStyle = g;
   circle(0, 0, rad);
+  // warm rim: the sun and a Sunbloom are the same yellow, so without an edge the two
+  // merge whenever they overlap
+  ctx.strokeStyle = '#b9700f';
+  ctx.lineWidth = Math.max(1, rad * 0.11);
+  ctx.beginPath(); ctx.arc(0, 0, rad * 0.96, 0, 7); ctx.stroke();
   ctx.restore();
 }
 
 function drawTray() {
-  const { w, trayH, slots } = G;
+  const { w, h, trayW, trayH, slots } = G;
+  const vert = trayW > 0;
   ctx.fillStyle = '#ffffffd8';
-  ctx.fillRect(0, 0, w, trayH);
+  ctx.fillRect(0, 0, vert ? trayW : w, vert ? h : trayH);
   ctx.strokeStyle = '#00000018';
   ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, trayH); ctx.lineTo(w, trayH); ctx.stroke();
+  ctx.beginPath();
+  if (vert) { ctx.moveTo(trayW, 0); ctx.lineTo(trayW, h); } else { ctx.moveTo(0, trayH); ctx.lineTo(w, trayH); }
+  ctx.stroke();
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1129,18 +1227,17 @@ function drawTray() {
     rr(sl.x, sl.y, sl.w, sl.h, sl.w * 0.16); ctx.stroke();
   }
   // wave progress along the bottom edge of the tray
+  const progress = (k, col) => {
+    ctx.fillStyle = '#00000012';
+    if (vert) ctx.fillRect(trayW - 3, 0, 3, h); else ctx.fillRect(0, trayH - 3, w, 3);
+    ctx.fillStyle = col;
+    if (vert) ctx.fillRect(trayW - 3, 0, 3, h * k); else ctx.fillRect(0, trayH - 3, w * k, 3);
+  };
   if (waveIdx >= 0 && waveIdx < waves.length) {
     const wv = waves[waveIdx];
-    const k = wv.spawns.length ? spawnIdx / wv.spawns.length : 1;
-    ctx.fillStyle = '#00000012';
-    ctx.fillRect(0, trayH - 3, w, 3);
-    ctx.fillStyle = wv.last ? '#d1443f' : '#6c8cff';
-    ctx.fillRect(0, trayH - 3, w * k, 3);
+    progress(wv.spawns.length ? spawnIdx / wv.spawns.length : 1, wv.last ? '#d1443f' : '#6c8cff');
   } else if (breatherT > 0 && waveIdx < 0) {
-    ctx.fillStyle = '#00000012';
-    ctx.fillRect(0, trayH - 3, w, 3);
-    ctx.fillStyle = '#7cc65a';
-    ctx.fillRect(0, trayH - 3, w * (1 - breatherT / prepMs()), 3);
+    progress(1 - breatherT / prepMs(), '#7cc65a');
   }
 }
 
@@ -1167,10 +1264,12 @@ function localPt(e) {
   const r = canvas.getBoundingClientRect();
   return [e.clientX - r.left, e.clientY - r.top];
 }
+// x is the depth axis (running right-to-left), y is the lane axis. Returns [lane, depth]
+// to match the [c, r] order the planting helpers take.
 function cellAt(x, y) {
-  const c = Math.floor((x - G.ox) / G.cell);
-  const r = Math.floor((y - G.oy) / G.cell);
-  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return null;
+  const c = Math.floor((y - G.oy) / G.cell);
+  const r = DEPTH - 1 - Math.floor((x - G.ox) / G.cell);
+  if (c < 0 || c >= LANES || r < 0 || r >= DEPTH) return null;
   return [c, r];
 }
 
@@ -1184,7 +1283,7 @@ canvas.addEventListener('pointerdown', e => {
     const sx = G.ox + s.gx * G.cell, sy = G.oy + s.gy * G.cell;
     if (Math.hypot(x - sx, y - sy) < G.cell * 0.34) {
       sun += s.value;
-      popup(s.gx, s.gy, '+' + s.value, '#fff3b0');
+      popup(sx, sy, '+' + s.value, '#fff3b0');
       suns.splice(i, 1);
       updateHud();
       return;
@@ -1192,7 +1291,7 @@ canvas.addEventListener('pointerdown', e => {
   }
   if (phase !== 'play') return;
 
-  if (y < G.trayH) {
+  if (G.trayW > 0 ? x < G.trayW : y < G.trayH) {
     for (const sl of G.slots) {
       if (x >= sl.x && x <= sl.x + sl.w && y >= sl.y && y <= sl.y + sl.h) {
         if (selected === sl.id) { selected = null; return; }
@@ -1214,7 +1313,7 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   if (!selected || selected === 'shovel') { hoverCell = null; return; }
   const [x, y] = localPt(e);
-  hoverCell = y < G.trayH ? null : cellAt(x, y);
+  hoverCell = (G.trayW > 0 ? x < G.trayW : y < G.trayH) ? null : cellAt(x, y);
 });
 canvas.addEventListener('pointerleave', () => { hoverCell = null; });
 
@@ -1235,6 +1334,7 @@ function loop(t) {
 }
 
 // ---------------- Boot ----------------
+lockLandscape();
 layout();
 loadState();
 startLevel(true);
@@ -1243,3 +1343,15 @@ window.addEventListener('resize', layout);
 if (window.ResizeObserver) new ResizeObserver(layout).observe(area);
 window.addEventListener('pagehide', saveState);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
+
+// Put portrait back before handing control to the menu. pagehide alone can lose the race
+// with the navigation, so the back button restores first and then leaves.
+const backBtn = document.querySelector('.topbar .back');
+if (backBtn) {
+  backBtn.onclick = async () => {
+    saveState();
+    await restorePortrait();
+    location.href = '../index.html';
+  };
+}
+window.addEventListener('pagehide', restorePortrait);

@@ -711,3 +711,18 @@ body.home { background: linear-gradient(170deg, #ffeef5, #e8f4ff 55%, #fdf6e3); 
 .ric-icon span { border-radius: 50%; background: #4dd4ff; }
 .ric-icon span.o { background: #ff8c42; }
 .ric-icon span.w { background: #ffffff; }
+
+/* Lawn Defense asks for landscape, where height is the scarce axis — five lanes have to
+   fit under the shared topbar and HUD, which together were eating ~40% of a 400px-tall
+   screen. Tighten them on short landscape viewports. Scoped to this page so the
+   portrait-locked games are untouched. */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.lawn .topbar { padding: calc(3px + var(--safe-top)) 10px 3px; }
+  body.lawn .topbar h1 { font-size: 15px; }
+  body.lawn .topbar .back { padding: 2px 8px; font-size: 18px; }
+  body.lawn .mini-hud { padding: 4px 10px; gap: 6px; }
+  body.lawn .hud-box { padding: 2px 6px; }
+  body.lawn .hud-box .label { font-size: 9px; letter-spacing: 0.3px; }
+  body.lawn .hud-box .val { font-size: 14px; }
+  body.lawn .mini-hud button { padding: 3px 12px; font-size: 17px; }
+}
