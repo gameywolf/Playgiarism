@@ -61,10 +61,25 @@ scraping the originals' servers or APIs.
   - `www/blockparty/` — Block Party (Block Blast clone: drag 3 pieces onto 8×8, clear rows/cols; combo-multiplied line bonuses + all-clear bonus; unplayable tray pieces grey out; board resumes + daily/weekly/all-time bests under `blockparty.state.v1` / `blockparty.scores.v1`)
   - `www/balls/` — Balls (Ballz clone: slingshot-aim a volley of bouncing balls at numbered blocks, white-dot sightline; launcher moves to where the first ball lands; double-tap fast-forwards; +1 ball rings grow the volley, coin pickups buy ball skins/trails in a store under `balls.store.v1`; score = rounds survived; run resumes + daily/weekly/all-time bests under `balls.state.v1` / `balls.scores.v1`)
   - `www/ricochet/` — Ricochet (Peggle-style: drop a ball from a top cannon into a peg
-    field and clear every orange peg within 10 balls; blue pegs score, green ★ pegs grant
-    Long Guide / Blaster / Multiball, one purple bonus peg is re-rolled each shot, and a
-    sliding bucket catches the ball for a free one. Score multiplier climbs as oranges
-    clear; the last orange drops into slow motion. Levels come from a seeded generator
+    field and clear every orange peg within 10 balls (the rack refills every level; only
+    score carries); blue pegs score, green ★ pegs grant Long Guide / Blaster / Spooky
+    Ball (drains wrap back in from the top) / Multiball, one purple bonus peg is
+    re-rolled each shot, and a sliding bucket catches the ball for a free one. The
+    scoring economy is Peggle's at 1/5 scale (same peg values but 18 oranges, not 25):
+    a meter fills with each shot's score and pays a free ball at 5k/15k/25k (their
+    25k/75k/125k); style bonuses feed the same meter (Long Shot 5k — consecutive
+    non-blue pegs ≥45% of the field apart; Off the Wall 2k; Free Ball Skills 1k — one
+    peg then bucket); the last orange triggers a fever finish where the bucket is
+    replaced by five floor slots (2k/10k/20k/10k/2k) and spare balls convert at 2k
+    each. Score multiplier climbs as oranges clear (fractional steps so ×10 is
+    reachable); the last orange drops into slow motion. Difficulty ramps because
+    everything else here got more generous: `orangeTarget()` grows the orange count
+    from 12 by one every second level to Peggle's 25, seeded peg movers (sliding
+    band or orbiting cluster) appear from level 4, and seeded brick arcs (capsule
+    pegs via `pegCore()`, eligible to be orange) from level 6 — bricks never move.
+    Balance was verified with a headless bot (vm + stubbed DOM): a ghost-sim
+    aiming bot clears levels 1-6 reliably and dies around level 7; the first-cut
+    ramp of +1 orange per level made even that bot die at median level 2. Levels come from a seeded generator
     (five layout families) so level N is reproducible without shipping a level list.
     The playfield is a fixed aspect with gutters (like Balls) — otherwise the peg lattice
     stretches with the window and the gap-to-ball ratio, which decides whether shots
