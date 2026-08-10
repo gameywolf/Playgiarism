@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Home Sweep Home</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Home Sweep Home</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud">
+    <div class="hud-box"><div class="label">Level</div><div class="val" id="hudLevel">1</div></div>
+    <div class="hud-box"><div class="label">Moves</div><div class="val" id="hudMoves">0</div></div>
+    <div class="hsw-objs" id="objs"></div>
+    <button id="restartBtn" title="Restart level">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="board"></canvas></div>
+</div>
+
+<!-- Level complete -->
+<div class="overlay" id="winOverlay">
+  <div class="dialog">
+    <h2 id="winTitle">🎉 Level Complete!</h2>
+    <p>All objectives done.</p>
+    <button class="primary" id="nextBtn">Next Level</button>
+  </div>
+</div>
+
+<!-- Out of moves -->
+<div class="overlay" id="loseOverlay">
+  <div class="dialog">
+    <h2 id="loseTitle">Out of Moves</h2>
+    <p>So close! Give it another go.</p>
+    <button class="primary" id="retryLevelBtn">Retry Level</button>
+  </div>
+</div>
+
+<script src="homesweep.js"></script>
+</body>
+</html>

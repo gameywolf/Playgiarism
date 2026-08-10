@@ -152,6 +152,17 @@ scraping the originals' servers or APIs.
     within a run but rolls back to `checkpoint` on a retry, so a failed level can't be
     farmed. Progress under `lawn.state.v1`, bests D/W/all under `lawn.scores.v1`)
   - `www/nertz/` — Nertz (real-time solitaire race: you + 3 CPUs, each with a 13-card Nertz pile, 4 work piles, and a 3-at-a-time stock, all racing simultaneously onto shared centre foundations built up by suit from the Ace; no turns — CPUs act on difficulty-scaled timers (Easy/Medium/Hard = speed + skill); tap a card to send it to the centre, drag to move onto your piles; empty your Nertz pile to end the round; +1 per card sent to centre, -2 per card left in Nertz pile; match to 100; state under `nertz.state.v1`)
+  - `www/homesweep/` — Home Sweep Home (Homescapes clone, match-3 half only, no
+    decorating metagame: 9×9 masked boards, swap/tap; 4-line → rocket (perpendicular),
+    2×2 → paper plane (cross blast + flies to the most useful target), L/T → bomb,
+    5-line → disco ball, all pairwise combos implemented. Obstacles: donuts (1 adjacent
+    match), crates (2 hits), bubbles (trap a piece until hit), grass (a match touching
+    grass grasses the whole match — spreads only via matches, so grass levels get extra
+    moves). Levels are seeded (`buildLevel`): mask family, obstacle mix (unlocks at
+    levels 2/4/6/8), colour-collect objectives and move counts all derive from the level
+    number; only refill pieces are random. Gravity fills diagonally around blockers and
+    holes so masked/blocked columns never starve. Progress under `homesweep.state.v1` —
+    level number only, no mid-level resume)
 - Photos come from the `@capacitor/camera` plugin when running natively, with an
   `<input type=file>` fallback so the games also work in a desktop browser for testing.
 

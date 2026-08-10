@@ -712,6 +712,46 @@ body.home { background: linear-gradient(170deg, #ffeef5, #e8f4ff 55%, #fdf6e3); 
 .ric-icon span.o { background: #ff8c42; }
 .ric-icon span.w { background: #ffffff; }
 
+/* ---------- Home Sweep Home ---------- */
+.tile-hsw { background: linear-gradient(140deg, #f472b6, #7c3aed); }
+.hsw-icon {
+  display: grid;
+  grid-template-columns: repeat(2, 22px);
+  grid-auto-rows: 22px;
+  gap: 5px;
+  padding: 9px;
+  background: #ffffff2e;
+  border-radius: 12px;
+}
+.hsw-icon span { border-radius: 50%; box-shadow: inset 0 2px 0 #ffffff50; }
+.hsw-icon .sq { border-radius: 6px; }
+.hsw-icon .dm { border-radius: 4px; transform: rotate(45deg) scale(0.85); }
+.hsw-objs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hsw-objs .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #00000012;
+  border-radius: 10px;
+  padding: 3px 8px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.hsw-objs .chip.done { opacity: 0.55; }
+.hsw-objs .chip .dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 /* Lawn Defense asks for landscape, where height is the scarce axis — five lanes have to
    fit under the shared topbar and HUD, which together were eating ~40% of a 400px-tall
    screen. Tighten them on short landscape viewports. Scoped to this page so the

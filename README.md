@@ -29,6 +29,7 @@ the network.
 | Awesome Falling | Radical Rappelling |
 | Ricochet | Peggle |
 | Lawn Defense | Plants vs. Zombies |
+| Home Sweep Home | Homescapes (the match-3 puzzles only — no decorating) |
 
 ## Building from source
 
