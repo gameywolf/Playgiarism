@@ -176,6 +176,9 @@ scraping the originals' servers or APIs.
     work/walk speed, shown as "effort %" in the staff sheet). Decor lifts rating,
     guests' mood as they walk past, and the fair entry fee. The HUD shows level
     progress (lifetime visitors); tapping the Rating box toasts its breakdown.
+    A 📊 Stats sheet shows a per-year ledger (visitors/sales/wages, kept in
+    `history`, last 12 years), plus per-shop customers/revenue/P&L and per-ride
+    riders/breakdowns — all persisted per building.
     Attendance is driven by `reputation`, an EMA of the instant rating
     (`REP_TAU` 90s ≈ 2 game months, persisted) — a quickly-fixed breakdown
     barely dents it, chronic 60% uptime converges to the degraded rating

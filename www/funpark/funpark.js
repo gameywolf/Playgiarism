@@ -78,6 +78,8 @@ let litter = [];                       // {i, n} n = bits of litter on cell
 let guests = [], staff = [];
 let lifetime = 0, level = 1;
 let rating = 0, monthSales = 0, brokeMonths = 0;
+let yearVisitors = 0, yearRev = 0, yearWages = 0;
+let history = [];      // one entry per completed year: {year, visitors, rev, wages}
 let reputation = -1;   // slow EMA of rating — this is what draws the crowds
 const REP_TAU = 90;    // seconds (~2 game months) to absorb a rating change
 let tool = null, placeType = null;     // toolbar state
@@ -105,8 +107,12 @@ function save() {
     v: 2, money, month, year, entryFee, shopPrice, asking, offer, lifetime, brokeMonths,
     rep: reputation,
     land: landBought,
+    yearVisitors, yearRev, yearWages, history,
     staff: staff.map(st => st.type),
-    buildings: buildings.map(b => ({ kind: b.kind, type: b.type, r: b.r, c: b.c })),
+    buildings: buildings.map(b => ({
+      kind: b.kind, type: b.type, r: b.r, c: b.c,
+      served: b.served || 0, rev: b.rev || 0, breaks: b.breaks || 0,
+    })),
     paths: grid.map((g, i) => (g && g.t === 'path' && i !== GATE) ? i : -1).filter(i => i >= 0),
   };
   localStorage.setItem(STATE_KEY, JSON.stringify(s));
@@ -122,6 +128,8 @@ function load() {
     shopPrice = s.shopPrice || {}; lifetime = s.lifetime || 0; brokeMonths = s.brokeMonths || 0;
     landBought = s.land || []; rebuildOwned();
     if (typeof s.rep === 'number') reputation = s.rep;
+    yearVisitors = s.yearVisitors || 0; yearRev = s.yearRev || 0; yearWages = s.yearWages || 0;
+    history = s.history || [];
     for (const k in STAFF) {
       // clamp to the current pay scale — old saves carry pre-rebalance salaries
       const cap = Math.round(STAFF[k].ask * Math.pow(1.15, Math.max(0, (s.year || 1) - 1)));
@@ -129,8 +137,10 @@ function load() {
       if (s.offer && s.offer[k]) offer[k] = Math.min(s.offer[k], asking[k]);
     }
     for (const i of s.paths || []) grid[remap(i)] = { t: 'path' };
-    for (const b of s.buildings || [])
-      placeBuilding(b.kind, b.type, old ? b.r + 4 : b.r, old ? b.c + 4 : b.c, true);
+    for (const b of s.buildings || []) {
+      const nb = placeBuilding(b.kind, b.type, old ? b.r + 4 : b.r, old ? b.c + 4 : b.c, true);
+      nb.served = b.served || 0; nb.rev = b.rev || 0; nb.breaks = b.breaks || 0;
+    }
     for (const t of s.staff || []) spawnStaff(t);
   } catch { }
 }
@@ -181,8 +191,8 @@ function canPlace(kind, r, c) {
 
 function placeBuilding(kind, type, r, c, silent) {
   const b = { kind, type, r, c, size: footprint(kind) };
-  if (kind === 'ride') Object.assign(b, { state: 'idle', timer: 0, queue: [], riders: [], claimed: false });
-  if (kind === 'shop') b.busy = 0;
+  if (kind === 'ride') Object.assign(b, { state: 'idle', timer: 0, queue: [], riders: [], claimed: false, served: 0, breaks: 0 });
+  if (kind === 'shop') Object.assign(b, { busy: 0, served: 0, rev: 0 });
   buildings.push(b);
   for (const i of cellsOf(b)) grid[i] = b;
   if (kind === 'shop' && !(type in shopPrice)) shopPrice[type] = SHOPS[type].fair;
@@ -286,7 +296,7 @@ function checkLevel() {
 function spawnGuest() {
   if (!isPath(GATE)) return;
   money += entryFee; monthSales += entryFee;
-  lifetime++; checkLevel();
+  lifetime++; yearVisitors++; checkLevel();
   guests.push({
     i: GATE, fx: colOf(GATE) + 0.5, fy: rowOf(GATE) + 0.5, route: [],
     state: 'walk', timer: 0, prev: -1,
@@ -370,6 +380,7 @@ function guestArrive(g) {
       return;
     }
     g.money -= price; money += price; monthSales += price;
+    b.served++; b.rev += price;
     b.busy = 1.2; g.state = 'buy'; g.pause = 1.2;
     if (def.need === 'joy') { g.joy = Math.min(100, g.joy + 30); g.hap += 6; }
     else { g[def.need] = 0; g.hap += 4; if (Math.random() < 0.55) g.litterT = rnd(6, 18); }
@@ -491,9 +502,10 @@ function tickRide(b, dt) {
         g.i = out; g.prev = -1; g.fx = colOf(out) + 0.5; g.fy = rowOf(out) + 0.5;
         g.route = []; g.goal = null; g.ride = null;
       }
+      b.served += b.riders.length;
       b.riders = [];
       if (Math.random() < (1 - def.rel) * 0.35) {
-        b.state = 'broken'; b.claimed = false;
+        b.state = 'broken'; b.claimed = false; b.breaks++;
         toast('⚠️ ' + def.name + ' broke down!');
         for (const q of b.queue) { q.state = 'walk'; q.hap -= 8; }
         b.queue = [];
@@ -704,11 +716,17 @@ function endMonth() {
   let wages = 0;
   for (const s of staff) wages += offer[s.type];
   money -= wages;
+  yearRev += monthSales; yearWages += wages;
   toast('📒 ' + MONTHS[month - 1] + ' Yr ' + year + ' — sales ' + fmt(monthSales) + ', wages ' + fmt(wages));
   brokeMonths = money < 0 ? brokeMonths + 1 : 0;
   monthSales = 0;
   month++;
-  if (month > 12) { month = 1; year++; newYear(); }
+  if (month > 12) {
+    history.push({ year, visitors: yearVisitors, rev: Math.round(yearRev), wages: yearWages });
+    if (history.length > 12) history.shift();
+    yearVisitors = 0; yearRev = 0; yearWages = 0;
+    month = 1; year++; newYear();
+  }
   if (brokeMonths >= 2) bust();
   save(); updateHud();
 }
@@ -987,6 +1005,29 @@ function openSheet(t) {
         <button class="fp-mini" data-fire="${key}" ${n ? '' : 'disabled'}>−1</button>
         <button class="fp-mini primary" data-hire="${key}">Hire</button>
       </div>`;
+    }
+    html += '</div>';
+  } else if (t === 'stats') {
+    const pl = n => `<b style="color:${n >= 0 ? '#2e9e52' : '#e33f3f'}">${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}</b>`;
+    html = '<div class="fp-rows">';
+    html += `<div class="fp-row"><span class="ic">🏞️</span>
+      <span class="nm">Park<small>level ${level} · ${lifetime.toLocaleString()} lifetime visitors · reputation ${Math.round(reputation)}</small></span></div>`;
+    html += `<div class="fp-row"><span class="ic">📅</span>
+      <span class="nm">Year ${year} so far<small>${yearVisitors} visitors · sales ${fmt(yearRev + monthSales)} · wages ${fmt(yearWages)} · ${pl(yearRev + monthSales - yearWages)}</small></span></div>`;
+    for (const h of [...history].reverse())
+      html += `<div class="fp-row"><span class="ic">📜</span>
+        <span class="nm">Year ${h.year}<small>${h.visitors} visitors · sales ${fmt(h.rev)} · wages ${fmt(h.wages)} · ${pl(h.rev - h.wages)}</small></span></div>`;
+    const counts = {};
+    for (const b of buildings) {
+      if (b.kind === 'decor') continue;
+      const def = defOf(b);
+      counts[b.type] = (counts[b.type] || 0) + 1;
+      const name = def.name + (counts[b.type] > 1 ? ' ' + counts[b.type] : '');
+      html += b.kind === 'shop'
+        ? `<div class="fp-row"><span class="ic">${def.icon}</span>
+           <span class="nm">${name}<small>${b.served} customers · revenue ${fmt(b.rev)} · ${pl(b.rev - def.cost)}</small></span></div>`
+        : `<div class="fp-row"><span class="ic">${def.icon}</span>
+           <span class="nm">${name}<small>${b.served} riders · ${b.breaks} breakdown${b.breaks === 1 ? '' : 's'}</small></span></div>`;
     }
     html += '</div>';
   } else if (t === 'prices') {
