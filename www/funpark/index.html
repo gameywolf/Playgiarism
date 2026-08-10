@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Fun Park</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="fp">
+
+<div class="screen active">
+  <div class="topbar">
+    <button class="back" onclick="location.href='../index.html'">←</button>
+    <h1>Fun Park</h1>
+    <div class="spacer"></div>
+  </div>
+  <div class="mini-hud fp-hud">
+    <div class="hud-box"><div class="label">Cash</div><div class="val" id="hudMoney">$0</div></div>
+    <div class="hud-box"><div class="label">Guests</div><div class="val" id="hudGuests">0</div></div>
+    <div class="hud-box" id="ratingBox" title="Tap for breakdown"><div class="label">Rating</div><div class="val" id="hudRating">0</div></div>
+    <div class="hud-box"><div class="label" id="hudLvlLabel">Level 1</div><div class="val" id="hudLvl">0/20</div></div>
+    <div class="hud-box"><div class="label">Date</div><div class="val" id="hudDate">Mar Y1</div></div>
+    <button id="resetBtn" title="Start a new park">🔄</button>
+  </div>
+  <div class="game-area"><canvas id="park"></canvas></div>
+  <div class="fp-sheet" id="sheet"></div>
+  <div class="fp-toolbar">
+    <button data-tool="path">🛣️<span>Path</span></button>
+    <button data-tool="rides">🎢<span>Rides</span></button>
+    <button data-tool="shops">🍟<span>Shops</span></button>
+    <button data-tool="decor">🌳<span>Decor</span></button>
+    <button data-tool="staff">🔧<span>Staff</span></button>
+    <button data-tool="prices">💲<span>Prices</span></button>
+    <button data-tool="delete">🗑️<span>Sell</span></button>
+  </div>
+</div>
+
+<div class="fp-toasts" id="toasts"></div>
+
+<!-- Bankruptcy -->
+<div class="overlay" id="bustOverlay">
+  <div class="dialog">
+    <h2>💸 Bankrupt!</h2>
+    <p>Two months in the red — the bank has repossessed your park.</p>
+    <button class="primary" id="bustRestart">Start a New Park</button>
+  </div>
+</div>
+
+<!-- Start over confirm -->
+<div class="overlay" id="resetOverlay">
+  <div class="dialog">
+    <h2>🚜 Start Over?</h2>
+    <p>Bulldoze the whole park and open a fresh one. This can't be undone.</p>
+    <button class="primary" id="resetYes">Start a New Park</button>
+    <button id="resetNo">Keep Playing</button>
+  </div>
+</div>
+
+<script src="funpark.js"></script>
+</body>
+</html>

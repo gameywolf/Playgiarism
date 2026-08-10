@@ -30,6 +30,7 @@ the network.
 | Ricochet | Peggle |
 | Lawn Defense | Plants vs. Zombies |
 | Home Sweep Home | Homescapes (the match-3 puzzles only — no decorating) |
+| Fun Park | Theme Park (Bullfrog, 1994) |
 
 ## Building from source
 

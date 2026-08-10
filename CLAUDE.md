@@ -163,6 +163,35 @@ scraping the originals' servers or APIs.
     number; only refill pieces are random. Gravity fills diagonally around blockers and
     holes so masked/blocked columns never starve. Progress under `homesweep.state.v1` —
     level number only, no mid-level resume)
+- `www/funpark/` — Fun Park (Bullfrog Theme Park clone, sandbox tycoon: lay paths
+    from the gate, place 2×2 rides / 1×1 shops / decor, set the entry fee and
+    per-shop prices (overpricing vs a shown "fair" value cuts arrivals/sales),
+    rides break down by per-ride reliability (mechanics fix), guests drop litter
+    (janitors sweep) and vandalise decor when unhappy (guards calm them). Idle
+    mechanics take k-center standby posts: rides are partitioned among free mechs
+    (farthest-point seeding) and each stands at the path cell minimizing worst-case
+    walk to its cluster, excluding rides already being fixed (`planMechStations`,
+    every 3s). Staff salaries renegotiate every New Year — asking pay +15%/yr,
+    offering <80% risks quits; pay over asking raises effort (morale multiplies
+    work/walk speed, shown as "effort %" in the staff sheet). Decor lifts rating,
+    guests' mood as they walk past, and the fair entry fee. The HUD shows level
+    progress (lifetime visitors); tapping the Rating box toasts its breakdown.
+    Attendance is driven by `reputation`, an EMA of the instant rating
+    (`REP_TAU` 90s ≈ 2 game months, persisted) — a quickly-fixed breakdown
+    barely dents it, chronic 60% uptime converges to the degraded rating
+    (Ben's call: momentary vs sustained quality should read differently). Rides/shops/decor unlock in tiers as lifetime visitors raise the park
+    level (thresholds in `LEVELS`). The world is 20×18 with a pinch-zoom/drag-pan
+    camera; you start owning the middle 12×14 and buy the 9 surrounding `PLOTS`
+    (tap twice to confirm; price escalates per plot). v1 saves used a bare 12×14
+    grid and are remapped +4,+4 into the start area on load. Litter is the
+    balance-critical pressure: ~30 guests once outran one janitor and the old
+    -1.2 rating/bit penalty death-spiralled the park (rating ≤ 4 stops arrivals),
+    so litter drops on 55% of purchases, rating loss is capped at 15, and a sweep
+    clears a whole pile — verified with a headless year-long sim (vm + stubbed
+    DOM) that must end year 1 near break-even with mech+janitor hired from day
+    one. Month = 40s; wages paid monthly; two months in the red = bankruptcy.
+    All drawing is procedural canvas + emoji glyphs. One persistent sandbox park
+    under `funpark.state.v1` (with `v:2` land format), no scores)
 - Photos come from the `@capacitor/camera` plugin when running natively, with an
   `<input type=file>` fallback so the games also work in a desktop browser for testing.
 
