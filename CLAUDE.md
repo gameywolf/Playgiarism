@@ -179,6 +179,9 @@ scraping the originals' servers or APIs.
     work/walk speed, shown as "effort %" in the staff sheet). Decor lifts rating,
     guests' mood as they walk past, and the fair entry fee. The HUD shows level
     progress (lifetime visitors); tapping the Rating box toasts its breakdown.
+    Hunger/thirst shops are sought deliberately; joy shops (balloon/gift) are
+    impulse buys rolled when a guest walks past, once per type per guest —
+    they were dead stock before that because guestDecide never shopped for joy.
     A 📊 Stats sheet shows a per-year ledger (visitors/sales/wages, kept in
     `history`, last 12 years), plus per-shop customers/revenue/P&L and per-ride
     riders/breakdowns — all persisted per building.

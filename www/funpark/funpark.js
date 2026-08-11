@@ -302,7 +302,7 @@ function spawnGuest() {
     state: 'walk', timer: 0, prev: -1,
     money: Math.max(5, rnd(30, 70) - entryFee * 0.3),
     hunger: rnd(0, 30), thirst: rnd(0, 30), joy: rnd(40, 70), hap: rnd(55, 75),
-    angry: false, angryT: 0, litterT: 0, hitT: 0, decorT: 0, stay: rnd(150, 280),
+    angry: false, angryT: 0, litterT: 0, hitT: 0, decorT: 0, bought: {}, stay: rnd(150, 280),
     shirt: `hsl(${Math.floor(rnd(0, 360))},55%,55%)`, leaving: false, ride: null,
   });
 }
@@ -439,16 +439,28 @@ function tickGuest(g, dt) {
   moveToward(g, next, 1.45 * dt, () => {
     g.prev = g.i; g.i = next; g.route.shift();
     if (litterAt(g.i) && g.hitT <= 0) { g.hap -= 1; g.hitT = 4; }
-    // strolling past landscaping lifts the mood
-    if (g.decorT <= 0) {
-      const r = rowOf(g.i), c = colOf(g.i);
-      for (const [ar, ac] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        if (!inGrid(r + ar, c + ac)) continue;
-        const t = grid[idx(r + ar, c + ac)];
-        if (t && t.kind === 'decor') { g.hap = Math.min(100, g.hap + 2); g.decorT = 6; break; }
+    // strolling past landscaping lifts the mood; balloon/gift stands are
+    // impulse buys — nobody *plans* a balloon, they walk past one (once each)
+    const r = rowOf(g.i), c = colOf(g.i);
+    let impulse = false;
+    for (const [ar, ac] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      if (!inGrid(r + ar, c + ac)) continue;
+      const t = grid[idx(r + ar, c + ac)];
+      if (!t || !t.kind) continue;
+      if (t.kind === 'decor' && g.decorT <= 0) { g.hap = Math.min(100, g.hap + 2); g.decorT = 6; }
+      if (t.kind === 'shop' && SHOPS[t.type].need === 'joy' && !g.bought[t.type] && !impulse) {
+        const def = SHOPS[t.type], price = shopPrice[t.type];
+        const accept = clamp(1.8 - price / def.fair, 0.05, 1);
+        if (price <= g.money && Math.random() < 0.35 * accept) {
+          g.bought[t.type] = true; impulse = true;
+          g.money -= price; money += price; monthSales += price;
+          t.served++; t.rev += price; t.busy = 1.2;
+          g.joy = Math.min(100, g.joy + 30); g.hap = Math.min(100, g.hap + 6);
+          g.state = 'buy'; g.pause = 1.2; g.goal = null;
+        }
       }
     }
-    guestArrive(g);
+    if (!impulse) guestArrive(g);
   });
 }
 
