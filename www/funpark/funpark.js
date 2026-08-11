@@ -540,18 +540,15 @@ function bfsDist(sources) {
   return dist;
 }
 
-/* Idle mechanics take up k-center standby posts: rides are partitioned among
-   idle mechs (farthest-point seeding, then nearest-seed assignment) and each
-   mech stands at the path cell minimizing the worst-case walk to any ride in
-   their cluster. A ride already being fixed is excluded, so a free mech
-   naturally repositions to cover the rest of the park while a colleague works. */
-function planMechStations() {
-  const idle = staff.filter(s => s.type === 'mech' && !s.job);
+/* k-center standby posts, shared by mechanics and janitors: targets are
+   partitioned among the idle staff (farthest-point seeding, then nearest-seed
+   assignment) and each stands at the path cell minimizing the worst-case walk
+   to any target in their cluster. Mechanics cover rides (excluding one already
+   being fixed, so a free mech repositions over the rest of the park while a
+   colleague works); janitors cover the food/drink shops litter radiates from. */
+function planStations(idle, targets) {
   for (const s of idle) s.station = -1;
-  if (!idle.length) return;
-  const targets = buildings.filter(b =>
-    b.kind === 'ride' && !(b.state === 'broken' && b.claimed) && adjPathCells(b).length);
-  if (!targets.length) return;
+  if (!idle.length || !targets.length) return;
   const dmaps = targets.map(b => bfsDist(adjPathCells(b)));
   const tdist = (i, j) => {
     let d = Infinity;
@@ -602,6 +599,36 @@ function planMechStations() {
     free.splice(bi, 1)[0].station = st;
   }
 }
+
+function planStaff() {
+  // mechanics: cover rides not already being fixed
+  planStations(
+    staff.filter(s => s.type === 'mech' && !s.job),
+    buildings.filter(b => b.kind === 'ride' && !(b.state === 'broken' && b.claimed) && adjPathCells(b).length));
+  // janitors: globally assign each unclaimed pile to the nearest free janitor
+  const jans = staff.filter(s => s.type === 'jan' && !s.job);
+  const unclaimed = litter.filter(l => !l.claimed);
+  if (jans.length && unclaimed.length) {
+    const pairs = [];
+    for (const s of jans) {
+      const dm = bfsDist([s.i]);
+      for (const l of unclaimed) if (dm[l.i] < Infinity) pairs.push({ s, l, d: dm[l.i] });
+    }
+    pairs.sort((a, b) => a.d - b.d);
+    const busy = new Set(), taken = new Set();
+    for (const p of pairs) {
+      if (busy.has(p.s) || taken.has(p.l)) continue;
+      busy.add(p.s); taken.add(p.l);
+      p.l.claimed = true;
+      p.s.job = { kind: 'sweep', l: p.l }; p.s.work = 0; p.s.station = -1;
+      p.s.route = bfs(p.s.i, i => i === p.l.i) || [];
+    }
+  }
+  // still-jobless janitors stand by where litter will appear: food/drink shops
+  planStations(
+    staff.filter(s => s.type === 'jan' && !s.job),
+    buildings.filter(b => b.kind === 'shop' && SHOPS[b.type].need !== 'joy' && adjPathCells(b).length));
+}
 function morale(type) { return clamp(offer[type] / asking[type], 0.4, 1.3); }
 
 function tickStaff(s, dt) {
@@ -615,15 +642,9 @@ function tickStaff(s, dt) {
         const route = spots.size ? bfs(s.i, i => spots.has(i)) : null;
         if (route) { b.claimed = true; s.job = { kind: 'fix', b }; s.route = route; s.work = 0; }
       }
-    } else if (s.type === 'jan') {
-      let best = null;
-      for (const l of litter) {
-        if (l.claimed) continue;
-        const route = bfs(s.i, i => i === l.i);
-        if (route && (!best || route.length < best.route.length)) best = { route, l };
-      }
-      if (best) { best.l.claimed = true; s.job = { kind: 'sweep', l: best.l }; s.route = best.route; s.work = 0; }
     }
+    // janitors get sweep jobs from planStaff(), which assigns each pile
+    // to the globally nearest free janitor instead of first-come claims
   }
   // move / work
   if (s.route.length) {
@@ -654,8 +675,8 @@ function tickStaff(s, dt) {
       return;
     }
   }
-  // mechanics hold their standby post instead of wandering
-  if (s.type === 'mech' && s.station >= 0) {
+  // mechanics and janitors hold their standby posts instead of wandering
+  if ((s.type === 'mech' || s.type === 'jan') && s.station >= 0) {
     if (s.i !== s.station) {
       const route = bfs(s.i, i => i === s.station);
       if (route && route.length) { s.route = route; }
@@ -680,7 +701,7 @@ let spawnT = 4, mechT = 0;
 function tickWorld(dt) {
   monthT += dt;
   mechT -= dt;
-  if (mechT <= 0) { mechT = 3; planMechStations(); }
+  if (mechT <= 0) { mechT = 3; planStaff(); }
   // reputation drifts toward today's rating — brief breakdowns barely dent it,
   // chronically broken rides drag it (and attendance) down over months
   reputation += (rating - reputation) * Math.min(1, dt / REP_TAU);

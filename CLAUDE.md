@@ -168,10 +168,13 @@ scraping the originals' servers or APIs.
     per-shop prices (overpricing vs a shown "fair" value cuts arrivals/sales),
     rides break down by per-ride reliability (mechanics fix), guests drop litter
     (janitors sweep) and vandalise decor when unhappy (guards calm them). Idle
-    mechanics take k-center standby posts: rides are partitioned among free mechs
-    (farthest-point seeding) and each stands at the path cell minimizing worst-case
-    walk to its cluster, excluding rides already being fixed (`planMechStations`,
-    every 3s). Staff salaries renegotiate every New Year — asking pay +15%/yr,
+    mechanics and janitors take k-center standby posts (`planStations` via
+    `planStaff`, every 3s): targets are partitioned among free staff
+    (farthest-point seeding) and each stands at the path cell minimizing
+    worst-case walk to its cluster — mechs cover rides (excluding one already
+    being fixed), janitors cover the food/drink shops litter radiates from.
+    Litter is assigned globally to the nearest free janitor rather than
+    first-come claims; guards still wander (patrolling is the point). Staff salaries renegotiate every New Year — asking pay +15%/yr,
     offering <80% risks quits; pay over asking raises effort (morale multiplies
     work/walk speed, shown as "effort %" in the staff sheet). Decor lifts rating,
     guests' mood as they walk past, and the fair entry fee. The HUD shows level
