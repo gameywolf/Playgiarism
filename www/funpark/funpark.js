@@ -1034,7 +1034,7 @@ function openSheet(t) {
     html = '<div class="fp-rows">';
     html += `<div class="fp-row"><span class="ic">🎟️</span>
       <span class="nm">Entry fee<small>guests expect ~${fmt(fairEntry())}</small></span>
-      <span class="fp-step"><button data-price="entry" data-d="-1">−</button><b>${fmt(entryFee)}</b><button data-price="entry" data-d="1">+</button></span></div>`;
+      <span class="fp-step"><button data-price="entry" data-d="-5">−5</button><button data-price="entry" data-d="-1">−</button><b>${fmt(entryFee)}</b><button data-price="entry" data-d="1">+</button><button data-price="entry" data-d="5">+5</button></span></div>`;
     for (const [key, d] of Object.entries(SHOPS)) {
       if (d.tier > level || !(key in shopPrice)) continue;
       html += `<div class="fp-row"><span class="ic">${d.icon}</span>
@@ -1068,7 +1068,7 @@ sheet.addEventListener('click', e => {
     if (j >= 0) { dropJob(staff[j]); staff.splice(j, 1); save(); openSheet('staff'); }
   } else if (btn.dataset.price) {
     const k = btn.dataset.price, d = Number(btn.dataset.d);
-    if (k === 'entry') entryFee = clamp(entryFee + d, 0, 60);
+    if (k === 'entry') entryFee = clamp(entryFee + d, 0, 150);
     else shopPrice[k] = clamp(shopPrice[k] + d, 1, 25);
     save(); openSheet('prices');
   }
