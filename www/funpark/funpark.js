@@ -195,7 +195,7 @@ function placeBuilding(kind, type, r, c, silent) {
   if (kind === 'shop') Object.assign(b, { busy: 0, served: 0, rev: 0 });
   buildings.push(b);
   for (const i of cellsOf(b)) grid[i] = b;
-  if (kind === 'shop' && !(type in shopPrice)) shopPrice[type] = SHOPS[type].fair;
+  if (kind === 'shop' && !(type in shopPrice)) shopPrice[type] = Math.round(shopFair(type));
   if (!silent) save();
   return b;
 }
@@ -252,6 +252,11 @@ function neighbors(i) {
 }
 
 // ---------------- Rating / progression ----------------
+// Staff asks compound 15%/yr, so guest wallets and fair prices ride the same
+// index — otherwise wages inevitably outrun a fixed revenue ceiling.
+const inflation = () => Math.pow(1.15, year - 1);
+const shopFair = type => SHOPS[type].fair * inflation();
+
 // Kiddie-park gate is ~$10 with a couple of rides; a big lineup supports $50+.
 // Landscaping justifies a slightly higher ticket too.
 function fairEntry() {
@@ -260,7 +265,7 @@ function fairEntry() {
     if (b.kind === 'ride') e += RIDES[b.type].excite * 1.5;
     if (b.kind === 'decor') decorPts += DECOR[b.type].pts;
   }
-  return Math.round(e + Math.min(6, decorPts * 0.4));
+  return Math.round((e + Math.min(6, decorPts * 0.4)) * inflation());
 }
 let ratingParts = { rides: 0, decor: 0, litter: 0, broken: 0, guests: 0 };
 function computeRating() {
@@ -300,7 +305,7 @@ function spawnGuest() {
   guests.push({
     i: GATE, fx: colOf(GATE) + 0.5, fy: rowOf(GATE) + 0.5, route: [],
     state: 'walk', timer: 0, prev: -1,
-    money: Math.max(5, rnd(30, 70) - entryFee * 0.3),
+    money: Math.max(5, rnd(30, 70) * inflation() - entryFee * 0.3),
     hunger: rnd(0, 30), thirst: rnd(0, 30), joy: rnd(40, 70), hap: rnd(55, 75),
     angry: false, angryT: 0, litterT: 0, hitT: 0, decorT: 0, bought: {}, stay: rnd(150, 280),
     shirt: `hsl(${Math.floor(rnd(0, 360))},55%,55%)`, leaving: false, ride: null,
@@ -372,7 +377,7 @@ function guestArrive(g) {
     const b = goal.b, def = SHOPS[b.type];
     if (buildings.indexOf(b) < 0) return;
     const price = shopPrice[b.type];
-    const accept = clamp(1.8 - price / def.fair, 0.05, 1);
+    const accept = clamp(1.8 - price / shopFair(b.type), 0.05, 1);
     if (price > g.money || Math.random() > accept) {
       g.hap -= 6; // too pricey — grumble, crave something else for a while
       if (def.need === 'joy') g.joy = Math.min(100, g.joy + 15);
@@ -449,8 +454,8 @@ function tickGuest(g, dt) {
       if (!t || !t.kind) continue;
       if (t.kind === 'decor' && g.decorT <= 0) { g.hap = Math.min(100, g.hap + 2); g.decorT = 6; }
       if (t.kind === 'shop' && SHOPS[t.type].need === 'joy' && !g.bought[t.type] && !impulse) {
-        const def = SHOPS[t.type], price = shopPrice[t.type];
-        const accept = clamp(1.8 - price / def.fair, 0.05, 1);
+        const price = shopPrice[t.type];
+        const accept = clamp(1.8 - price / shopFair(t.type), 0.05, 1);
         if (price <= g.money && Math.random() < 0.35 * accept) {
           g.bought[t.type] = true; impulse = true;
           g.money -= price; money += price; monthSales += price;
@@ -765,7 +770,7 @@ function endMonth() {
 }
 function newYear() {
   for (const k in STAFF) asking[k] = Math.round(asking[k] * 1.15);
-  toast('🎆 Happy New Year — staff demand higher pay!');
+  toast('🎆 Happy New Year — staff demand higher pay, and guests expect pricier tickets. Check your prices!');
   // underpaid staff walk out
   for (let k = staff.length - 1; k >= 0; k--) {
     const t = staff[k].type;
@@ -1071,7 +1076,7 @@ function openSheet(t) {
     for (const [key, d] of Object.entries(SHOPS)) {
       if (d.tier > level || !(key in shopPrice)) continue;
       html += `<div class="fp-row"><span class="ic">${d.icon}</span>
-        <span class="nm">${d.name}<small>fair price ${fmt(d.fair)}</small></span>
+        <span class="nm">${d.name}<small>fair price ${fmt(Math.round(shopFair(key)))}</small></span>
         <span class="fp-step"><button data-price="${key}" data-d="-1">−</button><b>${fmt(shopPrice[key])}</b><button data-price="${key}" data-d="1">+</button></span></div>`;
     }
     html += '</div>';
@@ -1101,8 +1106,8 @@ sheet.addEventListener('click', e => {
     if (j >= 0) { dropJob(staff[j]); staff.splice(j, 1); save(); openSheet('staff'); }
   } else if (btn.dataset.price) {
     const k = btn.dataset.price, d = Number(btn.dataset.d);
-    if (k === 'entry') entryFee = clamp(entryFee + d, 0, 150);
-    else shopPrice[k] = clamp(shopPrice[k] + d, 1, 25);
+    if (k === 'entry') entryFee = clamp(entryFee + d, 0, Math.max(150, fairEntry() * 3));
+    else shopPrice[k] = clamp(shopPrice[k] + d, 1, Math.max(25, Math.ceil(shopFair(k) * 3)));
     save(); openSheet('prices');
   }
 });

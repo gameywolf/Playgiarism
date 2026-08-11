@@ -179,6 +179,9 @@ scraping the originals' servers or APIs.
     work/walk speed, shown as "effort %" in the staff sheet). Decor lifts rating,
     guests' mood as they walk past, and the fair entry fee. The HUD shows level
     progress (lifetime visitors); tapping the Rating box toasts its breakdown.
+    Wages, fair prices, and guest wallets all ride one 15%/yr `inflation()`
+    index — wages alone compounding was a slow death sentence for every park;
+    the player re-raises their own prices to track the moving fair hints.
     Hunger/thirst shops are sought deliberately; joy shops (balloon/gift) are
     impulse buys rolled when a guest walks past, once per type per guest —
     they were dead stock before that because guestDecide never shopped for joy.
