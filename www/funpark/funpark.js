@@ -36,6 +36,15 @@ const RIDES = {
   gokart:   { name: 'Go-Karts',      icon: '🏎️', cost: 3400,  excite: 4, cap: 6,  dur: 9,  rel: 0.7,  tier: 3, base: '#c9d86e' },
   drop:     { name: 'Drop Tower',    icon: '🗼', cost: 6200,  excite: 7, cap: 10, dur: 8,  rel: 0.68, tier: 5, base: '#d8b06e' },
   rocket:   { name: 'Star Loop',     icon: '🚀', cost: 16000, excite: 10, cap: 12, dur: 10, rel: 0.58, tier: 7, base: '#9a8fe8' },
+  zoo:      { name: 'Petting Zoo',   icon: '🐐', cost: 800,   excite: 2, cap: 10, dur: 10, rel: 0.92, tier: 1, base: '#c9b98f' },
+  arcade:   { name: 'Arcade',        icon: '🕹️', cost: 1400,  excite: 3, cap: 6,  dur: 9,  rel: 0.9,  tier: 2, base: '#8f9be8' },
+  minigolf: { name: 'Mini Golf',     icon: '⛳', cost: 1200,  excite: 2, cap: 8,  dur: 12, rel: 0.95, tier: 2, base: '#9fd48f' },
+  funhouse: { name: 'Fun House',     icon: '🤡', cost: 3000,  excite: 4, cap: 8,  dur: 9,  rel: 0.75, tier: 3, base: '#e8b8d8' },
+  railway:  { name: 'Park Railway',  icon: '🚂', cost: 3600,  excite: 3, cap: 14, dur: 12, rel: 0.85, tier: 3, base: '#b8a88f' },
+  dino:     { name: 'Dino Safari',   icon: '🦖', cost: 4800,  excite: 5, cap: 10, dur: 11, rel: 0.8,  tier: 4, base: '#a8c87f' },
+  rapids:   { name: 'River Rapids',  icon: '🌊', cost: 6800,  excite: 6, cap: 8,  dur: 10, rel: 0.7,  tier: 5, base: '#7fa8e8' },
+  cyclone:  { name: 'Cyclone',       icon: '🌀', cost: 10000, excite: 8, cap: 8,  dur: 8,  rel: 0.65, tier: 6, base: '#8fd4d8' },
+  comet:    { name: 'Comet Coaster', icon: '☄️', cost: 18000, excite: 10, cap: 12, dur: 9, rel: 0.62, tier: 7, base: '#e8a87f' },
 };
 const SHOPS = {
   fries:   { name: 'Fry Shack',  icon: '🍟', cost: 450, need: 'hunger', fair: 4, tier: 1, base: '#f2c14e' },
@@ -46,6 +55,12 @@ const SHOPS = {
   candy:   { name: 'Candy Floss', icon: '🍭', cost: 500, need: 'hunger', fair: 3, tier: 2, base: '#f0b8d8' },
   pizza:   { name: 'Pizza Stand', icon: '🍕', cost: 800, need: 'hunger', fair: 6, tier: 4, base: '#e8c07f' },
   boba:    { name: 'Bubble Tea',  icon: '🧋', cost: 700, need: 'thirst', fair: 5, tier: 5, base: '#c8a878' },
+  popcorn: { name: 'Popcorn',     icon: '🍿', cost: 400, need: 'hunger', fair: 3, tier: 1, base: '#e8d89f' },
+  lemon:   { name: 'Lemonade',    icon: '🍋', cost: 450, need: 'thirst', fair: 4, tier: 2, base: '#e8e08f' },
+  burger:  { name: 'Burger Bar',  icon: '🍔', cost: 850, need: 'hunger', fair: 7, tier: 3, base: '#d8a87f' },
+  snow:    { name: 'Snow Cones',  icon: '🍧', cost: 600, need: 'thirst', fair: 4, tier: 3, base: '#b8d8e8' },
+  photo:   { name: 'Photo Booth', icon: '📸', cost: 900, need: 'joy',    fair: 9, tier: 5, base: '#9f9fb8' },
+  toys:    { name: 'Toy Store',   icon: '🧸', cost: 1200, need: 'joy',   fair: 12, tier: 6, base: '#d8b8a8' },
 };
 const DECOR = {
   tree:     { name: 'Tree',      icon: '🌳', cost: 120,  pts: 1, tier: 1 },
@@ -53,6 +68,9 @@ const DECOR = {
   fountain: { name: 'Fountain',  icon: '⛲', cost: 650,  pts: 3, tier: 3 },
   statue:   { name: 'Statue',    icon: '🗿', cost: 1300, pts: 4, tier: 5 },
   pond:     { name: 'Duck Pond', icon: '🦆', cost: 900,  pts: 3, tier: 4 },
+  arch:     { name: 'Balloon Arch', icon: '🎀', cost: 350,  pts: 2, tier: 2 },
+  palm:     { name: 'Palm Tree',    icon: '🌴', cost: 400,  pts: 2, tier: 3 },
+  ice:      { name: 'Ice Sculpture', icon: '⛄', cost: 1800, pts: 5, tier: 6 },
 };
 // Sized so a starter park's two staff run ~30% of achievable revenue, like a
 // real park's labor share — the old asks (80/50/65) were ~140% and bankrupted
