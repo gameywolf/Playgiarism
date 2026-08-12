@@ -925,11 +925,10 @@ function draw(now) {
     }
     let bob = 0;
     if (b.kind === 'ride' && b.state === 'running') bob = Math.sin(now / 130 + b.r) * cs * 0.06;
-    ctx.save();
-    ctx.shadowColor = '#00000055'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
+    // no canvas shadow here: Android WebView renders color-emoji shadows as the
+    // glyph's bounding box, which reads as a tinted square over every building
     ctx.font = `${s * (b.kind === 'decor' ? 0.8 : 0.58)}px serif`;
     ctx.fillText(def.icon, x + s / 2, y + s / 2 + bob + (b.kind === 'shop' ? s * 0.08 : 0));
-    ctx.restore();
     if (b.kind === 'ride') {
       if (b.state === 'broken' && Math.floor(now / 400) % 2) {
         ctx.font = `${s * 0.4}px serif`;
